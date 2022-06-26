@@ -53,7 +53,7 @@ function renderInstructionForProvider(url, provider) {
 
 async function renderAppleInstructions(url) {
   console.log(`Homepage URL: ${url}`)
-  console.log(`Authorization callback URL: ${url}/.auth/login/github/callback`)
+  console.log(`Authorization callback URL: ${url}/.auth/login/apple/callback`)
   return await inquirer.prompt([{
     name: "clientId",
     message: "Enter client ID:",
@@ -67,7 +67,7 @@ async function renderAppleInstructions(url) {
 
 async function renderFacebookInstructions(url) {
   console.log(`Homepage URL: ${url}`)
-  console.log(`Authorization callback URL: ${url}/.auth/login/github/callback`)
+  console.log(`Authorization callback URL: ${url}/.auth/login/facebook/callback`)
   return await inquirer.prompt([{
     name: "clientId",
     message: "Enter app ID:",
@@ -103,7 +103,7 @@ async function renderGoogleInstructions(url) {
   console.log("Follow the instructions for creating an OAuth app on GitHub.")
   console.log("Instructions: https://developers.google.com/identity/protocols/oauth2/openid-connect")
   console.log(`Homepage URL: ${url}`)
-  console.log(`Authorization callback URL: ${url}/.auth/login/github/callback`)
+  console.log(`Authorization callback URL: ${url}/.auth/login/google/callback`)
   return await inquirer.prompt([{
     name: "clientId",
     message: "Enter client ID:",
@@ -117,7 +117,7 @@ async function renderGoogleInstructions(url) {
 
 async function renderTwitterInstructions(url) {
   console.log(`Homepage URL: ${url}`)
-  console.log(`Authorization callback URL: ${url}/.auth/login/github/callback`)
+  console.log(`Authorization callback URL: ${url}/.auth/login/twitter/callback`)
   return await inquirer.prompt([{
     name: "clientId",
     message: "Enter API key:",
@@ -140,3 +140,20 @@ async function prepareSetupProvider(subscriptionId, location, resourceGroup, app
 }
 
 module.exports = setupEasyAuth
+
+
+// az webapp auth update --resource-group chiptunestac9c98 --name chiptunestac9c98
+// --enabled true --action AllowAnonymous --token-store true
+// --google-client-id 580722921481-d5r14v49fjhp2vp09b007qfajjrl9kfd.apps.googleusercontent.com --google-client-secret 4YD623bOEcZcMvNhZvdMwz6q
+
+
+
+// Google
+// Client ID: 580722921481-d5r14v49fjhp2vp09b007qfajjrl9kfd.apps.googleusercontent.com
+// Client Secret: 4YD623bOEcZcMvNhZvdMwz6q
+
+
+// az account set --subscription 81a77569-b654-4cae-8282-980ac9136597`
+// az config set defaults.location=westus2 defaults.group=remove-me
+// az webapp auth update --name remove-me-2 --enabled
+// az webapp auth github update --name remove-me-2 --client-id foo --client-secret bar
