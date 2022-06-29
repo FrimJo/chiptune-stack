@@ -1,142 +1,57 @@
 const inquirer = require("inquirer");
 const { execSync } = require('child_process');
 
-const providers = [{ name: 'Apple', value: 'apple' },
-{ name: 'Facebook', value: 'facebook' },
-{ name: 'GitHub', value: 'github' },
-{ name: 'Google', value: 'google' },
-{ name: 'Twitter', value: 'twitter' },
-{ name: 'Done (continue)', value: null }
-]
-
 async function setupEasyAuth(options) {
   const { subscriptionId, location, resourceGroup, appName, url } = options
 
-  // Add suppport for 'az webapp auth' running authV2
-  await execSync(`az extension add --name authV2`)
+  // Check if user wants to add authentication
+  const answer = await inquirer.prompt({
+    name: "provider",
+    message: "Add Google as authentication provider?",
+    type: "confirm",
+    default: true
+  });
 
-  const setupProvider = await prepareSetupProvider(subscriptionId, location, resourceGroup, appName)
+  // If user didn't want to add authentication, do not continue
+  if (!answer.provider) return
+  const extensionList = JSON.parse(await execSync(`az extension list`))
+  const authV2Installed = extensionList.some(e => e.name === 'authV2')
 
-  do {
-    const answer = await inquirer.prompt({
-      name: "provider",
-      message: "Please select authentication provider to support:",
-      type: "list",
-      choices: providers
-    });
-
-    if (answer.provider === null) break;
-    const providerIndex = providers.findIndex(p => p.value === answer.provider)
-    const [provider] = providers.splice(providerIndex, 1)
-
-    const { clientId, clientSecret } = await renderInstructionForProvider(url, provider.value)
-    if (!clientId) throw Error('No clientId provided for provider: ' + provider.name)
-    if (!clientSecret) throw Error('No clientSecret provided for provider: ' + provider.name)
-
-    console.log(`Adding provider ${provider.name} ⏰`)
-    await setupProvider(provider.value, clientId, clientSecret)
-    console.log(`Provider ${provider.name} added 🎉`)
-  } while (true)
-  console.log('Done adding prvoiders, continuing with setup...')
-}
-
-function renderInstructionForProvider(url, provider) {
-  switch (provider) {
-    case 'apple': return renderAppleInstructions(url)
-    case 'facebook': return renderFacebookInstructions(url)
-    case 'github': return renderGitHubInstructions(url)
-    case 'google': return renderGoogleInstructions(url)
-    case 'twitter': return renderTwitterInstructions(url)
-    default: throw Error(`Could not find ${provider} provider`)
+  // Add suppport for 'az webapp auth' running authV2 if not already installed
+  if (!authV2Installed) {
+    console.log('Installing extension authV2... ⏰')
+    await execSync(`az extension add --name authV2`)
+    console.log('Finished installing extension authV2 🎉')
   }
-}
 
-async function renderAppleInstructions(url) {
-  console.log(`Homepage URL: ${url}`)
-  console.log(`Authorization callback URL: ${url}/.auth/login/apple/callback`)
-  return await inquirer.prompt([{
-    name: "clientId",
-    message: "Enter client ID:",
-    type: "input"
-  }, {
-    name: "clientSecret",
-    message: "Enter client Secret:",
-    type: "input"
-  }]);
-}
-
-async function renderFacebookInstructions(url) {
-  console.log(`Homepage URL: ${url}`)
-  console.log(`Authorization callback URL: ${url}/.auth/login/facebook/callback`)
-  return await inquirer.prompt([{
-    name: "clientId",
-    message: "Enter app ID:",
-    type: "input"
-  }, {
-    name: "clientSecret",
-    message: "Enter app Secret:",
-    type: "input"
-  }]);
-}
-
-async function renderGitHubInstructions(url) {
-  console.log("Follow the instructions for creating an OAuth app on GitHub.")
-  console.log("Instructions: https://docs.github.com/en/developers/apps/building-oauth-apps/creating-an-oauth-app")
-  console.log("You will need to enter below information.")
-  console.log(`Homepage URL: ${url}`)
-  console.log(`Authorization callback URL: ${url}/.auth/login/github/callback`)
-  console.log("On the application page, make note of the Client ID, which you'll need later.")
-  console.log("Under Client Secrets, select Generate a new client secret.")
-  console.log("Make note of the client secret value, which you'll need later.")
-  return await inquirer.prompt([{
-    name: "clientId",
-    message: "Enter client ID:",
-    type: "input"
-  }, {
-    name: "clientSecret",
-    message: "Enter client Secret:",
-    type: "input"
-  }]);
-}
-
-async function renderGoogleInstructions(url) {
-  console.log("Follow the instructions for creating an OAuth app on GitHub.")
-  console.log("Instructions: https://developers.google.com/identity/protocols/oauth2/openid-connect")
-  console.log(`Homepage URL: ${url}`)
-  console.log(`Authorization callback URL: ${url}/.auth/login/google/callback`)
-  return await inquirer.prompt([{
-    name: "clientId",
-    message: "Enter client ID:",
-    type: "input"
-  }, {
-    name: "clientSecret",
-    message: "Enter client Secret:",
-    type: "input"
-  }]);
-}
-
-async function renderTwitterInstructions(url) {
-  console.log(`Homepage URL: ${url}`)
-  console.log(`Authorization callback URL: ${url}/.auth/login/twitter/callback`)
-  return await inquirer.prompt([{
-    name: "clientId",
-    message: "Enter API key:",
-    type: "input"
-  }, {
-    name: "clientSecret",
-    message: "Enter API Secret:",
-    type: "input"
-  }]);
-}
-
-async function prepareSetupProvider(subscriptionId, location, resourceGroup, appName) {
+  // Set default values
   await execSync(`az account set --subscription ${subscriptionId}`)
   await execSync(`az config set defaults.location=${location} defaults.group=${resourceGroup}`)
+
+  // Setup basis to enable adding authentication provider
   await execSync(`az webapp auth update --name ${appName} --enabled true --action AllowAnonymous`)
 
-  return async function (provider, clientId, clientSecret) {
-    await execSync(`az webapp auth ${provider} update --name ${appName} --client-id ${clientId} --client-secret ${clientSecret} --yes`)
-  }
+  console.log("Follow the instructions for creating an OAuth app on Google.")
+  console.log("Instructions: https://developers.google.com/identity/protocols/oauth2/openid-connect")
+  console.log("Enter below homepage URL and authorization callback URL when creating the app.")
+  console.log(`Homepage URL: ${url}`)
+  console.log(`Authorization callback URL: ${url}/.auth/login/google/callback`)
+  const { clientId, clientSecret } = await inquirer.prompt([{
+    name: "clientId",
+    message: "Enter client ID:",
+    type: "input"
+  }, {
+    name: "clientSecret",
+    message: "Enter client Secret:",
+    type: "input"
+  }]);
+
+  if (!clientId) throw Error('No clientId provided for Google provider')
+  if (!clientSecret) throw Error('No clientSecret provided for Google provider')
+
+  console.log(`Adding Google authentication provider... ⏰`)
+  await execSync(`az webapp auth google update --name ${appName} --client-id ${clientId} --client-secret ${clientSecret} --yes`)
+  console.log(`Added Google authentication provider successfully 🎉`)
 }
 
 module.exports = setupEasyAuth
