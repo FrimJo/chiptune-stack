@@ -4,16 +4,6 @@ const { execSync } = require('child_process');
 async function setupEasyAuth(options) {
   const { subscriptionId, location, resourceGroup, appName, url } = options
 
-  // Check if user wants to add authentication
-  const answer = await inquirer.prompt({
-    name: "provider",
-    message: "Add Google as authentication provider?",
-    type: "confirm",
-    default: true
-  });
-
-  // If user didn't want to add authentication, do not continue
-  if (!answer.provider) return
   const extensionList = JSON.parse(await execSync(`az extension list`))
   const authV2Installed = extensionList.some(e => e.name === 'authV2')
 
