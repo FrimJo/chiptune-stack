@@ -41,7 +41,7 @@ async function setupEasyAuth(options) {
 
   console.log(`Adding Google authentication provider... ⏰`)
   await execSync(`az webapp auth google update --name ${appName} --client-id ${clientId} --client-secret ${clientSecret} --yes`)
-  console.log(`Added Google authentication provider successfully 🎉`)
+  console.log(`Successfully added Google authentication provider 🎉`)
 }
 
 module.exports = setupEasyAuth
