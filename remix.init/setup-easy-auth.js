@@ -16,7 +16,7 @@ async function setupEasyAuth(options) {
 
   // Set default values
   await execSync(`az account set --subscription ${subscriptionId}`)
-  await execSync(`az config set defaults.location=${location} defaults.group=${resourceGroup}`)
+  await execSync(`az configure --defaults location=${location} group=${resourceGroup}`)
 
   // Setup basis to enable adding authentication provider
   await execSync(`az webapp auth update --name ${appName} --enabled true --action AllowAnonymous`)
