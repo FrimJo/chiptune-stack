@@ -28,15 +28,14 @@ function getRandomPassword(
 }
 
 async function main({ rootDirectory }) {
-  const README_PATH = path.join(rootDirectory, "README.md");
-  const EXAMPLE_ENV_PATH = path.join(rootDirectory, ".env.example");
-  const ENV_PATH = path.join(rootDirectory, ".env");
-  const PACKAGE_JSON_PATH = path.join(rootDirectory, "package.json");
+  const readmePath = path.join(rootDirectory, "README.md");
+  const exampleEnvPath = path.join(rootDirectory, ".env.example");
+  const envPath = path.join(rootDirectory, ".env");
+  const packageJsonPath = path.join(rootDirectory, "package.json");
 
-  const REPLACER = "chiptune-stack-template";
-  const DIR_NAME = path.basename(rootDirectory);
-  const APP_NAME = DIR_NAME.replace(/-/g, "").slice(0, 12);
-  console.log(`Start creating app with name`, APP_NAME);
+  const dirName = path.basename(rootDirectory);
+  const appName = dirName.replace(/-/g, "").slice(0, 12);
+  console.log(`Start creating app with name`, appName);
 
   const azureSubscriptions = JSON.parse(execSync(`az login`));
   console.log("Azure login success", azureSubscriptions);
@@ -45,16 +44,19 @@ async function main({ rootDirectory }) {
     await fs.readFile(`${__dirname}/azure/parameters.json`)
   );
 
+  const sqlServerPassword = getRandomPassword();
+  const sqlServerUsername = appName;
+
   const configuration = [
-    { name: "AZURE_SUBSCRIPTION_ID", value: azureSubscriptions[0].id },
-    { name: "WEB_SITE_NAME", value: APP_NAME },
-    { name: "SQL_SERVER_NAME", value: APP_NAME },
-    { name: "WEB_SERVERFARMS_NAME", value: APP_NAME },
-    { name: "CONTAINER_REGISTRY_NAME", value: APP_NAME },
-    { name: "CONTAINER_REGISTRY_IMAGE_NAME_AND_LABEL", value: APP_NAME },
-    { name: "CONTAINER_REGISTRY_USERNAME", value: "Username.1" },
-    { name: "SQL_SERVER_ADMIN_USERNAME", value: APP_NAME },
-    { name: "SQL_SERVER_ADMIN_PASSWORD", value: getRandomPassword() },
+    { name: "azure_subscription_id", value: azureSubscriptions[0].id },
+    { name: "web_site_name", value: appName },
+    { name: "sql_server_name", value: appName },
+    { name: "web_serverfarms_name", value: appName },
+    { name: "container_registry_name", value: appName },
+    { name: "container_registry_image_name_and_label", value: appName },
+    { name: "container_registry_username", value: "Username.1" },
+    { name: "sql_server_admin_username", value: sqlServerUsername },
+    { name: "sql_server_admin_password", value: sqlServerPassword },
   ];
 
   configuration.forEach((parameter) => {
@@ -68,7 +70,7 @@ async function main({ rootDirectory }) {
 
   const location = "northeurope";
   const resourceGroup = JSON.parse(
-    execSync(`az group create --location ${location} --name ${APP_NAME}`)
+    execSync(`az group create --location ${location} --name ${appName}`)
   );
   console.log("Created new resource group", resourceGroup);
 
@@ -78,17 +80,21 @@ async function main({ rootDirectory }) {
   );
   const deployment = JSON.parse(
     execSync(
-      `az deployment group create --template-file ${__dirname}/azure/template.json --parameters @${__dirname}/azure/replaced_parameters.json --resource-group ${resourceGroup.name} --name ${APP_NAME}`
+      `az deployment group create --template-file ${__dirname}/azure/template.json --parameters @${__dirname}/azure/replaced_parameters.json --resource-group ${resourceGroup.name} --name ${appName}`
     )
   );
+  console.log("Success!", JSON.stringify(deployment, null, 2));
 
-  console.log("Setting up container registry access");
-  const servicePrincipalName = deployment[""];
+  console.log("Setting up container registry access...");
   const acrRegistryId = execSync(
-    `az acr show --name $ACR_NAME --query "id" --output tsv`
-  );
-  const acrPassword = `$(az ad sp create-for-rbac --name ${servicePrincipalName} --scopes ${acrRegistryId} --role acrpush --query "password" --output tsv)`;
-  const acrUsername = `$(az ad sp list --display-name ${servicePrincipalName} --query "[].appId" --output tsv)`;
+    `az acr show --name ${appName} --query "id" --output tsv`
+  ).toString("utf8");
+  const acrPassword = execSync(
+    `az ad sp create-for-rbac --display-name ${appName} --scopes "${acrRegistryId}" --role acrpush --query "password" --output tsv`
+  ).toString("utf8");
+  const acrUsername = execSync(
+    `az ad sp list --display-name ${appName} --query "[].appId" --output tsv`
+  ).toString("utf8");
 
   console.log(
     `Add the following configuration to your repository Github Actions secrets: `
@@ -98,7 +104,8 @@ async function main({ rootDirectory }) {
       {
         AZURE_REGISTRY_USERNAME: acrUsername,
         AZURE_REGISTRY_PASSWORD: acrPassword,
-        DATABASE_URL: deployment[""],
+        DATABASE_CONNECTION_STRING:
+          deployment.outputs.sqlServerConnectionString.value,
       },
       null,
       2
@@ -108,9 +115,9 @@ async function main({ rootDirectory }) {
   await inquirer.prompt({ type: "confirm" });
 
   const [readme, env, packageJson] = await Promise.all([
-    fs.readFile(README_PATH, "utf-8"),
-    fs.readFile(EXAMPLE_ENV_PATH, "utf-8"),
-    fs.readFile(PACKAGE_JSON_PATH, "utf-8"),
+    fs.readFile(readmePath, "utf-8"),
+    fs.readFile(exampleEnvPath, "utf-8"),
+    fs.readFile(packageJsonPath, "utf-8"),
   ]);
 
   let newEnv = env.replace(
@@ -119,8 +126,8 @@ async function main({ rootDirectory }) {
   );
 
   const newReadme = readme.replace(
-    new RegExp(escapeRegExp(REPLACER), "g"),
-    APP_NAME
+    new RegExp(escapeRegExp("chiptune-stack-template"), "g"),
+    appName
   );
 
   const answers = await inquirer.prompt([
@@ -183,7 +190,7 @@ async function main({ rootDirectory }) {
 
   const newPackageJson =
     JSON.stringify(
-      sort({ ...JSON.parse(packageJson), name: APP_NAME }),
+      sort({ ...JSON.parse(packageJson), name: appName }),
       null,
       2
     ) + "\n";
@@ -191,9 +198,9 @@ async function main({ rootDirectory }) {
   console.log(`Updating template files with what you've told us`);
 
   await Promise.all([
-    fs.writeFile(README_PATH, newReadme),
-    fs.writeFile(ENV_PATH, newEnv),
-    fs.writeFile(PACKAGE_JSON_PATH, newPackageJson),
+    fs.writeFile(readmePath, newReadme),
+    fs.writeFile(envPath, newEnv),
+    fs.writeFile(packageJsonPath, newPackageJson),
   ]);
 
   console.log(`Removing temporary files from disk.`);

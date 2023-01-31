@@ -2,34 +2,34 @@
     "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "AZURE_SUBSCRIPTION_ID": {
-            "value": "AZURE_SUBSCRIPTION_ID"
+        "azure_subscription_id": {
+            "value": "azure_subscription_id"
         },
-        "WEB_SITE_NAME": {
+        "web_site_name": {
             "value": "mychiptunestackappsite"
         },
-        "SQL_SERVER_NAME": {
+        "sql_server_name": {
             "value": "mychiptunestacksqlserver"
         },
-        "WEB_SERVERFARMS_NAME": {
+        "web_serverfarms_name": {
             "value": "mychiptunestackappserverfarm"
         },
-        "CONTAINER_REGISTRY_NAME": {
+        "container_registry_name": {
             "value": "mychiptunestackcontainerregistry"
         },
-        "CONTAINER_REGISTRY_IMAGE_NAME_AND_LABEL": {
+        "container_registry_image_name_and_label": {
             "value": "mychiptunestackimage:latest"
         },
-        "CONTAINER_REGISTRY_USERNAME": {
+        "container_registry_username": {
             "value": "Username.1"
         },
-        "SQL_SERVER_ADMIN_USERNAME": {
+        "sql_server_admin_username": {
             "value": "Username.1"
         },
-        "SQL_SERVER_ADMIN_PASSWORD": {
+        "sql_server_admin_password": {
             "value": "Password.1"
         },
-        "SESSION_SECRET": {
+        "session_secret": {
             "value": "Secret.1"
         }
     }

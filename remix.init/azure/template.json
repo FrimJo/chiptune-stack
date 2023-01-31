@@ -2,53 +2,53 @@
     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "AZURE_SUBSCRIPTION_ID": {
+        "azure_subscription_id": {
             "defaultValue": "00000000-0000-0000-0000-000000000000",
             "type": "String"
         },
-        "SQL_SERVER_NAME": {
+        "sql_server_name": {
             "defaultValue": "sql_servers_name",
             "type": "String"
         },
-        "SQL_SERVER_LOCATION": {
+        "sql_server_location": {
             "defaultValue": "northeurope",
             "type": "String"
         },
-        "WEB_SITE_NAME": {
+        "web_site_name": {
             "defaultValue": "web_site_name",
             "type": "String"
         },
-        "WEB_SERVERFARMS_NAME": {
+        "web_serverfarms_name": {
             "defaultValue": "web_serverfarms_name",
             "type": "String"
         },
-        "WEB_SERVERFARMS_LOCATION": {
+        "web_serverfarms_location": {
             "defaultValue": "northeurope",
             "type": "String"
         },
-        "CONTAINER_REGISTRY_NAME": {
+        "container_registry_name": {
             "defaultValue": "containerregistryname",
             "type": "String"
         },
-        "CONTAINER_REGISTRY_IMAGE_NAME_AND_LABEL": {
+        "container_registry_image_name_and_label": {
             "defaultValue": "container_image_name:label",
             "type": "String"
         },
-        "CONTAINER_REGISTRY_LOCATION": {
+        "container_registry_location": {
             "defaultValue": "northeurope",
             "type": "String"
         },
-        "CONTAINER_REGISTRY_USERNAME": {
+        "container_registry_username": {
             "defaultValue": "container_registry_username",
             "type": "String"
         },
-        "SQL_SERVER_ADMIN_USERNAME": {
+        "sql_server_admin_username": {
             "type": "SecureString"
         },
-        "SQL_SERVER_ADMIN_PASSWORD": {
+        "sql_server_admin_password": {
             "type": "SecureString"
         },
-        "SESSION_SECRET": {
+        "session_secret": {
             "type": "SecureString"
         }
     },
@@ -57,8 +57,8 @@
         {
             "type": "Microsoft.ContainerRegistry/registries",
             "apiVersion": "2022-02-01-preview",
-            "name": "[parameters('CONTAINER_REGISTRY_NAME')]",
-            "location": "[parameters('CONTAINER_REGISTRY_LOCATION')]",
+            "name": "[parameters('container_registry_name')]",
+            "location": "[parameters('container_registry_location')]",
             "sku": {
                 "name": "Basic",
                 "tier": "Basic"
@@ -101,12 +101,12 @@
         {
             "type": "Microsoft.Sql/servers",
             "apiVersion": "2021-11-01-preview",
-            "name": "[parameters('SQL_SERVER_NAME')]",
-            "location": "[parameters('SQL_SERVER_LOCATION')]",
+            "name": "[parameters('sql_server_name')]",
+            "location": "[parameters('sql_server_location')]",
             "kind": "v12.0",
             "properties": {
-                "administratorLogin": "[parameters('SQL_SERVER_ADMIN_USERNAME')]",
-                "administratorLoginPassword": "[parameters('SQL_SERVER_ADMIN_PASSWORD')]",
+                "administratorLogin": "[parameters('sql_server_admin_username')]",
+                "administratorLoginPassword": "[parameters('sql_server_admin_password')]",
                 "version": "12.0",
                 "minimalTlsVersion": "1.2",
                 "publicNetworkAccess": "Enabled",
@@ -116,8 +116,8 @@
         {
             "type": "Microsoft.Web/serverfarms",
             "apiVersion": "2021-03-01",
-            "name": "[parameters('WEB_SERVERFARMS_NAME')]",
-            "location": "[parameters('WEB_SERVERFARMS_LOCATION')]",
+            "name": "[parameters('web_serverfarms_name')]",
+            "location": "[parameters('web_serverfarms_location')]",
             "sku": {
                 "name": "B1",
                 "tier": "Basic",
@@ -142,10 +142,10 @@
         {
             "type": "Microsoft.Sql/servers/connectionPolicies",
             "apiVersion": "2021-11-01-preview",
-            "name": "[concat(parameters('SQL_SERVER_NAME'), '/default')]",
-            "location": "[parameters('SQL_SERVER_LOCATION')]",
+            "name": "[concat(parameters('sql_server_name'), '/default')]",
+            "location": "[parameters('sql_server_location')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Sql/servers', parameters('SQL_SERVER_NAME'))]"
+                "[resourceId('Microsoft.Sql/servers', parameters('sql_server_name'))]"
             ],
             "properties": {
                 "connectionType": "Default"
@@ -154,10 +154,10 @@
         {
             "type": "Microsoft.Sql/servers/databases",
             "apiVersion": "2021-11-01-preview",
-            "name": "[concat(parameters('SQL_SERVER_NAME'), '/', parameters('WEB_SITE_NAME'))]",
-            "location": "[parameters('SQL_SERVER_LOCATION')]",
+            "name": "[concat(parameters('sql_server_name'), '/', parameters('web_site_name'))]",
+            "location": "[parameters('sql_server_location')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Sql/servers', parameters('SQL_SERVER_NAME'))]"
+                "[resourceId('Microsoft.Sql/servers', parameters('sql_server_name'))]"
             ],
             "sku": {
                 "name": "Standard",
@@ -172,16 +172,16 @@
                 "zoneRedundant": false,
                 "readScale": "Disabled",
                 "requestedBackupStorageRedundancy": "Local",
-                "maintenanceConfigurationId": "[concat('/subscriptions/', parameters('AZURE_SUBSCRIPTION_ID'), '/providers/Microsoft.Maintenance/publicMaintenanceConfigurations/SQL_Default')]",
+                "maintenanceConfigurationId": "[concat('/subscriptions/', parameters('azure_subscription_id'), '/providers/Microsoft.Maintenance/publicMaintenanceConfigurations/SQL_Default')]",
                 "isLedgerOn": false
             }
         },
         {
             "type": "Microsoft.Sql/servers/firewallRules",
             "apiVersion": "2021-11-01-preview",
-            "name": "[concat(parameters('SQL_SERVER_NAME'), '/AllowAllWindowsAzureIps')]",
+            "name": "[concat(parameters('sql_server_name'), '/AllowAllWindowsAzureIps')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Sql/servers', parameters('SQL_SERVER_NAME'))]"
+                "[resourceId('Microsoft.Sql/servers', parameters('sql_server_name'))]"
             ],
             "properties": {
                 "startIpAddress": "0.0.0.0",
@@ -191,33 +191,33 @@
         {
             "type": "Microsoft.Web/sites",
             "apiVersion": "2021-03-01",
-            "name": "[parameters('WEB_SITE_NAME')]",
-            "location": "[parameters('WEB_SERVERFARMS_LOCATION')]",
+            "name": "[parameters('web_site_name')]",
+            "location": "[parameters('web_serverfarms_location')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Web/serverfarms', parameters('WEB_SERVERFARMS_NAME'))]"
+                "[resourceId('Microsoft.Web/serverfarms', parameters('web_serverfarms_name'))]"
             ],
             "kind": "app,linux,container",
             "properties": {
                 "enabled": true,
                 "hostNameSslStates": [
                     {
-                        "name": "[concat(parameters('WEB_SITE_NAME'), '.azurewebsites.net')]",
+                        "name": "[concat(parameters('web_site_name'), '.azurewebsites.net')]",
                         "sslState": "Disabled",
                         "hostType": "Standard"
                     },
                     {
-                        "name": "[concat(parameters('WEB_SITE_NAME'), '.scm.azurewebsites.net')]",
+                        "name": "[concat(parameters('web_site_name'), '.scm.azurewebsites.net')]",
                         "sslState": "Disabled",
                         "hostType": "Repository"
                     }
                 ],
-                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('WEB_SERVERFARMS_NAME'))]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('web_serverfarms_name'))]",
                 "reserved": true,
                 "isXenon": false,
                 "hyperV": false,
                 "siteConfig": {
                     "numberOfWorkers": 1,
-                    "linuxFxVersion": "[concat('DOCKER|', parameters('CONTAINER_REGISTRY_NAME'), '.azurecr.io/', parameters('CONTAINER_REGISTRY_IMAGE_NAME_AND_LABEL'))]",
+                    "linuxFxVersion": "[concat('DOCKER|', parameters('container_registry_name'), '.azurecr.io/', parameters('container_registry_image_name_and_label'))]",
                     "acrUseManagedIdentityCreds": false,
                     "alwaysOn": false,
                     "http20Enabled": false,
@@ -236,7 +236,7 @@
                 "redundancyMode": "None",
                 "storageAccountRequired": false,
                 "keyVaultReferenceIdentity": "SystemAssigned",
-                "publishingUsername": "[parameters('CONTAINER_REGISTRY_USERNAME')]"
+                "publishingUsername": "[parameters('container_registry_username')]"
             },
             "resources": [
                 {
@@ -244,11 +244,11 @@
                     "name": "appsettings",
                     "type": "config",
                     "dependsOn": [
-                        "[parameters('WEB_SITE_NAME')]"
+                        "[parameters('web_site_name')]"
                     ],
                     "properties": {
-                        "DATABASE_URL": "[concat('sqlserver://', reference(resourceId('Microsoft.Sql/servers', parameters('SQL_SERVER_NAME'))).fullyQualifiedDomainName, ';user=', parameters('SQL_SERVER_ADMIN_USERNAME'), ';database=', parameters('WEB_SITE_NAME'), ';password=', parameters('SQL_SERVER_ADMIN_PASSWORD'), ';')]",
-                        "SESSION_SECRET": "[parameters('SESSION_SECRET')]"
+                        "DATABASE_URL": "[concat('sqlserver://', reference(resourceId('Microsoft.Sql/servers', parameters('sql_server_name'))).fullyQualifiedDomainName, ';user=', parameters('sql_server_admin_username'), ';database=', parameters('web_site_name'), ';password=', parameters('sql_server_admin_password'), ';')]",
+                        "SESSION_SECRET": "[parameters('session_secret')]"
                     }
                 }
             ]
@@ -256,10 +256,10 @@
         {
             "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
             "apiVersion": "2021-03-01",
-            "name": "[concat(parameters('WEB_SITE_NAME'), '/ftp')]",
-            "location": "[parameters('WEB_SERVERFARMS_LOCATION')]",
+            "name": "[concat(parameters('web_site_name'), '/ftp')]",
+            "location": "[parameters('web_serverfarms_location')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('WEB_SITE_NAME'))]"
+                "[resourceId('Microsoft.Web/sites', parameters('web_site_name'))]"
             ],
             "properties": {
                 "allow": true
@@ -268,10 +268,10 @@
         {
             "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
             "apiVersion": "2021-03-01",
-            "name": "[concat(parameters('WEB_SITE_NAME'), '/scm')]",
-            "location": "[parameters('WEB_SERVERFARMS_LOCATION')]",
+            "name": "[concat(parameters('web_site_name'), '/scm')]",
+            "location": "[parameters('web_serverfarms_location')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('WEB_SITE_NAME'))]"
+                "[resourceId('Microsoft.Web/sites', parameters('web_site_name'))]"
             ],
             "properties": {
                 "allow": true
@@ -280,10 +280,10 @@
         {
             "type": "Microsoft.Web/sites/config",
             "apiVersion": "2021-03-01",
-            "name": "[concat(parameters('WEB_SITE_NAME'), '/web')]",
-            "location": "[parameters('WEB_SERVERFARMS_LOCATION')]",
+            "name": "[concat(parameters('web_site_name'), '/web')]",
+            "location": "[parameters('web_serverfarms_location')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('WEB_SITE_NAME'))]"
+                "[resourceId('Microsoft.Web/sites', parameters('web_site_name'))]"
             ],
             "properties": {
                 "numberOfWorkers": 1,
@@ -299,7 +299,7 @@
                     "hostingstart.html"
                 ],
                 "netFrameworkVersion": "v4.0",
-                "linuxFxVersion": "[concat('DOCKER|', parameters('CONTAINER_REGISTRY_NAME'), '.azurecr.io/', parameters('CONTAINER_REGISTRY_IMAGE_NAME_AND_LABEL'))]",
+                "linuxFxVersion": "[concat('DOCKER|', parameters('container_registry_name'), '.azurecr.io/', parameters('container_registry_image_name_and_label'))]",
                 "requestTracingEnabled": false,
                 "remoteDebuggingEnabled": false,
                 "remoteDebuggingVersion": "VS2019",
@@ -307,7 +307,7 @@
                 "acrUseManagedIdentityCreds": false,
                 "logsDirectorySizeLimit": 35,
                 "detailedErrorLoggingEnabled": false,
-                "publishingUsername": "[parameters('CONTAINER_REGISTRY_USERNAME')]",
+                "publishingUsername": "[parameters('container_registry_username')]",
                 "scmType": "None",
                 "use32BitWorkerProcess": true,
                 "webSocketsEnabled": false,
@@ -361,13 +361,13 @@
         {
             "type": "Microsoft.Web/sites/hostNameBindings",
             "apiVersion": "2021-03-01",
-            "name": "[concat(parameters('WEB_SITE_NAME'), '/', parameters('WEB_SITE_NAME'), '.azurewebsites.net')]",
-            "location": "[parameters('WEB_SERVERFARMS_LOCATION')]",
+            "name": "[concat(parameters('web_site_name'), '/', parameters('web_site_name'), '.azurewebsites.net')]",
+            "location": "[parameters('web_serverfarms_location')]",
             "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('WEB_SITE_NAME'))]"
+                "[resourceId('Microsoft.Web/sites', parameters('web_site_name'))]"
             ],
             "properties": {
-                "siteName": "[parameters('WEB_SITE_NAME')]",
+                "siteName": "[parameters('web_site_name')]",
                 "hostNameType": "Verified"
             }
         }
@@ -375,11 +375,15 @@
     "outputs": {
         "appURL": {
             "type": "string",
-            "value": "[reference(resourceId('Microsoft.Web/sites', parameters('WEB_SITE_NAME'))).defaultHostName]"
+            "value": "[reference(resourceId('Microsoft.Web/sites', parameters('web_site_name'))).defaultHostName]"
         },
         "containerRegistryPrincipal": {
             "type": "string",
-            "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('CONTAINER_REGISTRY_NAME'))).loginServer]"
+            "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('container_registry_name'))).loginServer]"
+        },
+        "sqlServerConnectionString": {
+            "type": "string",
+            "value": "[concat('sqlserver://', reference(resourceId('Microsoft.Sql/servers', parameters('sql_server_name'))).fullyQualifiedDomainName, ';user=', parameters('sql_server_admin_username'), ';database=', parameters('web_site_name'), ';password=', parameters('sql_server_admin_password'), ';')]"
         }
     }
 }
