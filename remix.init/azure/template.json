@@ -247,7 +247,7 @@
                         "[parameters('web_site_name')]"
                     ],
                     "properties": {
-                        "DATABASE_URL": "[concat('sqlserver://', reference(resourceId('Microsoft.Sql/servers', parameters('sql_server_name'))).fullyQualifiedDomainName, ';user=', parameters('sql_server_admin_username'), ';database=', parameters('web_site_name'), ';password=', parameters('sql_server_admin_password'), ';')]",
+                        "DATABASE_CONNECTION_STRING": "[concat('sqlserver://', reference(resourceId('Microsoft.Sql/servers', parameters('sql_server_name'))).fullyQualifiedDomainName, ';user=', parameters('sql_server_admin_username'), ';database=', parameters('web_site_name'), ';password=', parameters('sql_server_admin_password'), ';')]",
                         "SESSION_SECRET": "[parameters('session_secret')]"
                     }
                 }

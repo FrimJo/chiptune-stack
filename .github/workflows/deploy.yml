@@ -7,14 +7,18 @@ on:
   pull_request: {}
 
 env:
-  IMAGE_NAME: APP_NAME
+  IMAGE_NAME: ${IMAGE_NAME}
   NODE_VERSION: 16
-  AZURE_WEBAPP_NAME: APP_NAME
+  AZURE_WEBAPP_NAME: ${AZURE_WEBAPP_NAME}
+  AZURE_REGISTRY_URL: ${AZURE_REGISTRY_URL}
+  AZURE_SUBSCRIPTION_ID: ${AZURE_SUBSCRIPTION_ID}
+  AZURE_TENTANT_ID: ${AZURE_TENTANT_ID}
 
 jobs:
   lint:
     name: ⬣ ESLint
     runs-on: ubuntu-latest
+    permissions: write-all
     steps:
       - name: 🛑 Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.11.0
@@ -36,6 +40,7 @@ jobs:
   typecheck:
     name: ʦ TypeScript
     runs-on: ubuntu-latest
+    permissions: write-all
     steps:
       - name: 🛑 Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.11.0
@@ -57,6 +62,7 @@ jobs:
   vitest:
     name: ⚡ Vitest
     runs-on: ubuntu-latest
+    permissions: write-all
     steps:
       - name: 🛑 Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.11.0
@@ -140,6 +146,7 @@ jobs:
     # only build/deploy main branch on pushes
     if: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name == 'push' }}
     runs-on: ubuntu-latest
+    permissions: write-all
     steps:
       - name: 🛑 Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.11.0
