@@ -128,17 +128,17 @@ async function main({ rootDirectory, ...rest }) {
 
   await inquirer.prompt({ type: "confirm" });
 
-  const [readme, env, packageJson] = await Promise.all([
+  const [readme, env, packageJson, deployYml] = await Promise.all([
     fs.readFile(readmePath, "utf-8"),
     fs.readFile(exampleEnvPath, "utf-8"),
     fs.readFile(packageJsonPath, "utf-8"),
+    fs.readFile(deployYmlPath, "utf-8"),
   ]);
 
   let newEnv = env.replace(
     /^SESSION_SECRET=.*$/m,
     `SESSION_SECRET="${getRandomString(16)}"`
   );
-
   const newReadme = readme.replace(
     new RegExp(escapeRegExp("chiptune-stack-template"), "g"),
     appName
@@ -211,18 +211,14 @@ async function main({ rootDirectory, ...rest }) {
 
   const newDeployYml = deployYml;
   const deployYmlSearchReplace = [
+    { search: "${AZURE_WEBAPP_NAME}", replace: appName },
     {
-      search: "${AZURE_WEBAPP_NAME}",
-      replace: appName,
       search: "${AZURE_REGISTRY_URL}",
       replace: outputs.containerRegistryPrincipal,
-      search: "${AZURE_SUBSCRIPTION_ID}",
-      replace: subscriptionId,
-      search: "${AZURE_TENTANT_ID}",
-      replace: tenantId,
-      search: "${IMAGE_NAME}",
-      replace: appName,
     },
+    { search: "${AZURE_SUBSCRIPTION_ID}", replace: subscriptionId },
+    { search: "${AZURE_TENTANT_ID}", replace: tenantId },
+    { search: "${IMAGE_NAME}", replace: appName },
   ];
 
   deployYmlSearchReplace.forEach((replace) => {
