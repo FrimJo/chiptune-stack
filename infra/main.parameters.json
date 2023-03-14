@@ -8,14 +8,20 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
+    "webContainerAppName": {
+      "value": "${WEB_CONTAINER_APP_NAME}"
+    },
     "webImageName": {
       "value": "${SERVICE_WEB_IMAGE_NAME}"
     },
     "databasePassword": {
-      "value": "$(secretOrRandomPassword)"
+      "value": "${DB_SERVER_PASSWORD}"
+    },
+    "databaseUsername": {
+      "value": "${DB_SERVER_USERNAME}"
     },
     "sessionSecret": {
-      "value": "$(secretOrRandomPassword)"
+      "value": "${SESSION_SECRET}"
     }
   }
 }
