@@ -1,6 +1,6 @@
 const { execSync } = require("child_process");
 const crypto = require("crypto");
-const fs = require("fs/promises");
+const fs = require("fs");
 const path = require("path");
 const inquirer = require("inquirer");
 const { EOL } = require("os");
@@ -13,6 +13,16 @@ const debugMode = true;
 function debug(...str) {
   if (debugMode) {
     console.log(...str);
+  }
+}
+
+function terminal(str, args) {
+  const result = execSync(str, args);
+  try {
+    return JSON.parse(result);
+  } catch (e) {
+    console.error(e);
+    return result;
   }
 }
 
@@ -38,16 +48,16 @@ async function setupGithubWorkflow(
   appName,
   subscriptionId,
   tenantId,
-  acrUsername,
-  acrPassword,
+  registryName,
+  registryLoginServer,
   deploymentOutputs,
   deployYmlPath
 ) {
   await inquirer.prompt({
     message: `Set up a repository on GitHub and add the following configuration to your repository Github Actions secrets \n ${JSON.stringify(
       {
-        AZURE_REGISTRY_USERNAME: acrUsername,
-        AZURE_REGISTRY_PASSWORD: acrPassword,
+        AZURE_REGISTRY_NAME: registryName,
+        AZURE_REGISTRY_URL: registryLoginServer,
         DATABASE_CONNECTION_STRING: deploymentOutputs.databaseConnectionString,
       },
       null,
@@ -60,14 +70,14 @@ async function setupGithubWorkflow(
     { search: "${AZURE_WEBAPP_NAME}", replace: appName },
     {
       search: "${AZURE_REGISTRY_URL}",
-      replace: deploymentOutputs.containerRegistryPrincipal,
+      replace: registryLoginServer,
     },
     { search: "${AZURE_SUBSCRIPTION_ID}", replace: subscriptionId },
     { search: "${AZURE_TENTANT_ID}", replace: tenantId },
     { search: "${IMAGE_NAME}", replace: appName },
   ];
 
-  let newDeployYml = fs.readFile(deployYmlPath, "utf-8");
+  let newDeployYml = fs.readFileSync(deployYmlPath, "utf8");
 
   deployYmlSearchReplace.forEach((replace) => {
     newDeployYml = newDeployYml.replace(
@@ -76,11 +86,11 @@ async function setupGithubWorkflow(
     );
   });
 
-  fs.writeFile(deployYmlPath, newDeployYml);
+  fs.writeFileSync(deployYmlPath, newDeployYml);
 }
 
 function setupPackageJson(appName, packageJsonPath) {
-  const packageJson = fs.readFile(packageJsonPath, "utf-8");
+  const packageJson = fs.readFileSync(packageJsonPath, "utf8");
   const newPackageJson =
     JSON.stringify(
       sort({ ...JSON.parse(packageJson), name: appName }),
@@ -88,7 +98,7 @@ function setupPackageJson(appName, packageJsonPath) {
       2
     ) + "\n";
 
-  fs.writeFile(packageJsonPath, newPackageJson);
+  fs.writeFileSync(packageJsonPath, newPackageJson);
 }
 
 function setupEnvironmentFile(
@@ -96,7 +106,7 @@ function setupEnvironmentFile(
   envPath,
   databaseConnectionStrings
 ) {
-  const env = fs.readFile(exampleEnvPath, "utf-8");
+  const env = fs.readFileSync(exampleEnvPath, "utf8");
 
   let newEnv = env.replace(
     /^SESSION_SECRET=.*$/m,
@@ -112,37 +122,38 @@ function setupEnvironmentFile(
     newEnv += `${EOL}SHADOW_DATABASE_URL="${databaseConnectionStrings.shadowConnectionString}"`;
   }
 
-  fs.writeFile(envPath, newEnv);
+  fs.writeFileSync(envPath, newEnv);
 }
 
-function setupReadme(readmePath, appName) {
-  const readme = fs.readFile(readmePath, "utf-8");
+function setupReadme(rootDirectory, appName) {
+  const readmePath = path.join(rootDirectory, "README.md");
+  const readme = fs.readFileSync(readmePath, "utf8");
   const newReadme = readme.replace(
     new RegExp(escapeRegExp("chiptune-stack-template"), "g"),
     appName
   );
 
-  fs.writeFile(readmePath, newReadme);
+  fs.writeFileSync(readmePath, newReadme);
 }
 
-async function setupDatabase() {
+async function setupDatabase(azureDatabaseConnectionStrings) {
   const answers = await inquirer.prompt([
     {
       name: "dbType",
       type: "list",
       message: "What database server should we use?",
       choices: ["devcontainer", "Local", "Azure"],
-      default: "devcontainer",
+      default: "Local",
     },
   ]);
 
-  let connectionString = "";
-  let shadowConnectionString = "";
-
   switch (answers.dbType) {
     case "devcontainer":
-      connectionString = "postgresql://postgres:$AzureR0cks!@db:5432/remix";
-      break;
+      return {
+        database: "devcontainer",
+        connectionString: "postgresql://postgres:$AzureR0cks!@db:5432/remix",
+        shadowConnectionString: null,
+      };
     case "Local":
       const localAnswers = await inquirer.prompt([
         {
@@ -152,36 +163,26 @@ async function setupDatabase() {
           default: "postgresql://postgres:postgres@localhost:5432/remix",
         },
       ]);
-      connectionString = localAnswers.connStr;
-      break;
+
+      return {
+        database: "local",
+        connectionString: localAnswers.connStr,
+        shadowConnectionString: null,
+      };
     case "Azure":
-      const azureAnswers = await inquirer.prompt([
-        {
-          name: "connStr",
-          type: "input",
-          message: "What is the connection string?",
-        },
-        {
-          name: "shadowConnectionString",
-          message: "Database connection string for the shadow db:",
-          type: "input",
-        },
-      ]);
-      connectionString = azureAnswers.connStr;
-      shadowConnectionString = azureAnswers.shadowConnectionString;
-      break;
+      return {
+        database: "azure",
+        connectionString: azureDatabaseConnectionStrings.connectionString,
+        shadowConnectionString:
+          azureDatabaseConnectionStrings.shadowConnectionString,
+      };
     default:
       throw new Error("Unknown dbType");
   }
-
-  return {
-    connectionString,
-    shadowConnectionString,
-  };
 }
 
 async function setupAzureResources(appName) {
-  const azureSubscriptions = JSON.parse(execSync(`az login`));
+  const azureSubscriptions = terminal(`az login`);
 
   debug("Azure login success", azureSubscriptions);
 
@@ -191,70 +192,50 @@ async function setupAzureResources(appName) {
   const subscriptionId = azureSubscriptions[0].id;
   const tenantId = azureSubscriptions[0].tenantId;
 
+  const sessionSecret = appName;
+
+  const location = "Europe";
+
   const deploymentParametersSearchReplace = [
-    { search: "${AZURE_ENV_NAME}", replace: subscriptionId },
-    { search: "${AZURE_LOCATION}", replace: appName },
-    { search: "${SERVICE_WEB_IMAGE_NAME}", replace: appName },
-    { search: "${DB_SERVER_PASSWORD}", replace: dbServerPassword },
-    { search: "${DB_SERVER_USERNAME}", replace: dbServerUsername },
-    { search: "${SESSION_SECRET}", replace: appName },
-    { search: "${WEB_CONTAINER_APP_NAME}", replace: appName },
+    { search: "environmentName", replace: subscriptionId },
+    { search: "location", replace: appName },
+    { search: "webContainerAppName", replace: appName },
+    { search: "databasePassword", replace: dbServerPassword },
+    { search: "databaseUsername", replace: dbServerUsername },
+    { search: "sessionSecret", replace: sessionSecret },
+    { search: "webImageName", replace: appName },
   ];
 
   const parametersJSONFile = JSON.parse(
-    await fs.readFile(`${__dirname}/../infra/main.parameters.json`)
+    fs.readFileSync(`${__dirname}/../infra/main.parameters.json`, "utf8")
   );
 
   deploymentParametersSearchReplace.forEach((parameter) => {
     parametersJSONFile.parameters[parameter.search].value = parameter.replace;
   });
 
-  await fs.writeFile(
+  fs.writeFileSync(
     `${__dirname}/../infra/main-replaced.parameters.json`,
     JSON.stringify(parametersJSONFile, null, 2)
   );
 
-  const location = "northeurope";
-  const resourceGroup = JSON.parse(
-    execSync(`az group create --location ${location} --name ${appName}`)
-  );
-  debug("Created new resource group", resourceGroup);
-
-  const resourceGroupName = resourceGroup.name;
-
   debug("Deploying stack to Azure with parameters...", parametersJSONFile);
-  const deployment = JSON.parse(
-    execSync(
-      `az deployment group create -g ${resourceGroupName} --template-file ${__dirname}/../infra/ --parameters @${__dirname}/../main-replaced.parameters.json --name ${appName}`
-    )
+  const deployment = terminal(
+    `azd init --environment ${appName} --subscription ${subscriptionId} --location ${location}`
   );
 
   debug("Success!", JSON.stringify(deployment, null, 2));
 
-  debug("Setting up container registry access...");
-  const acrRegistryId = execSync(
-    `az acr show --name ${appName} --query "id" --output tsv`
-  ).toString("utf8");
-  const acrPassword = execSync(
-    `az ad sp create-for-rbac --display-name ${appName} --scopes "${acrRegistryId}" --role acrpush --query "password" --output tsv`
-  ).toString("utf8");
-  const acrUsername = execSync(
-    `az ad sp list --display-name ${appName} --query "[].appId" --output tsv`
-  ).toString("utf8");
-
   return {
     tenantId,
     subscriptionId,
-    acrPassword,
-    acrUsername,
-    deploymentOutputs: deployment.properties.outputs,
+    deploymentOutputs: deployment,
   };
 }
 
 async function main({ rootDirectory, ...rest }) {
   debug("Starting Remix template...", rootDirectory, rest);
 
-  const readmePath = path.join(rootDirectory, "README.md");
   const exampleEnvPath = path.join(rootDirectory, ".env.example");
   const envPath = path.join(rootDirectory, ".env");
   const packageJsonPath = path.join(rootDirectory, "package.json");
@@ -270,29 +251,30 @@ async function main({ rootDirectory, ...rest }) {
 
   debug(`Start creating app with name`, appName);
 
-  const databaseConnectionStrings = setupDatabase();
+  const { tenantId, subscriptionId, deploymentOutputs } =
+    await setupAzureResources(appName);
 
-  const {
-    tenantId,
-    subscriptionId,
-    acrUsername,
-    acrPassword,
-    deploymentOutputs,
-  } = setupAzureResources();
+  console.log("Deployment", deploymentOutputs);
+
+  setupDatabase(deploymentOutputs);
 
   setupGithubWorkflow(
     appName,
     subscriptionId,
     tenantId,
-    acrUsername,
-    acrPassword,
-    deploymentOutputs.databaseConnectionString,
+    deploymentOutputs.registryName,
+    deploymentOutputs.registryLoginServer,
+    deploymentOutputs.databaseConnectionStrings,
     deployYmlPath
   );
 
-  setupReadme(readmePath, appName);
+  setupReadme(rootDirectory, appName);
 
-  setupEnvironmentFile(exampleEnvPath, envPath, databaseConnectionStrings);
+  setupEnvironmentFile(
+    exampleEnvPath,
+    envPath,
+    deploymentOutputs.databaseConnectionStrings
+  );
 
   setupPackageJson(packageJsonPath);
 
@@ -316,7 +298,7 @@ async function main({ rootDirectory, ...rest }) {
     debug(
       `Running the setup script to make sure everything was set up properly`
     );
-    execSync(`npm run setup`, { stdio: "inherit", cwd: rootDirectory });
+    terminal(`npm run setup`, { stdio: "inherit", cwd: rootDirectory });
   }
 
   debug(`✅ Project is ready! Start development with "npm run dev"`);
