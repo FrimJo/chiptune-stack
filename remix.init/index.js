@@ -16,8 +16,8 @@ function debug(...str) {
   }
 }
 
-function terminal(str, args) {
-  const result = execSync(str, args);
+function terminal(str, args = {}) {
+  const result = execSync(str, { encoding: "utf8", ...args }).toString();
   try {
     return JSON.parse(result);
   } catch (e) {
@@ -51,8 +51,15 @@ async function setupGithubWorkflow(
   registryName,
   registryLoginServer,
   deploymentOutputs,
-  deployYmlPath
+  rootDirectory
 ) {
+  const deployYmlPath = path.join(
+    rootDirectory,
+    ".github",
+    "workflows",
+    "deploy.yml"
+  );
+
   await inquirer.prompt({
     message: `Set up a repository on GitHub and add the following configuration to your repository Github Actions secrets \n ${JSON.stringify(
       {
@@ -89,7 +96,8 @@ async function setupGithubWorkflow(
   fs.writeFileSync(deployYmlPath, newDeployYml);
 }
 
-function setupPackageJson(appName, packageJsonPath) {
+function setupPackageJson(appName, rootDirectory) {
+  const packageJsonPath = path.join(rootDirectory, "package.json");
   const packageJson = fs.readFileSync(packageJsonPath, "utf8");
   const newPackageJson =
     JSON.stringify(
@@ -101,11 +109,9 @@ function setupPackageJson(appName, packageJsonPath) {
   fs.writeFileSync(packageJsonPath, newPackageJson);
 }
 
-function setupEnvironmentFile(
-  exampleEnvPath,
-  envPath,
-  databaseConnectionStrings
-) {
+function setupEnvironmentFile(databaseConnectionStrings, rootDirectory) {
+  const exampleEnvPath = path.join(rootDirectory, ".env.example");
+  const envPath = path.join(rootDirectory, ".env");
   const env = fs.readFileSync(exampleEnvPath, "utf8");
 
   let newEnv = env.replace(
@@ -125,7 +131,7 @@ function setupEnvironmentFile(
   fs.writeFileSync(envPath, newEnv);
 }
 
-function setupReadme(rootDirectory, appName) {
+function setupReadme(appName, rootDirectory) {
   const readmePath = path.join(rootDirectory, "README.md");
   const readme = fs.readFileSync(readmePath, "utf8");
   const newReadme = readme.replace(
@@ -181,7 +187,7 @@ async function setupDatabase(azureDatabaseConnectionStrings) {
   }
 }
 
-async function setupAzureResources(appName) {
+async function setupAzureResources(appName, rootDirectory) {
   const azureSubscriptions = terminal(`az login`);
 
   debug("Azure login success", azureSubscriptions);
@@ -192,13 +198,11 @@ async function setupAzureResources(appName) {
   const subscriptionId = azureSubscriptions[0].id;
   const tenantId = azureSubscriptions[0].tenantId;
 
-  const sessionSecret = appName;
+  const sessionSecret = getRandomString(16);
 
-  const location = "Europe";
+  const location = "northeurope";
 
   const deploymentParametersSearchReplace = [
-    { search: "environmentName", replace: subscriptionId },
-    { search: "location", replace: appName },
     { search: "webContainerAppName", replace: appName },
     { search: "databasePassword", replace: dbServerPassword },
     { search: "databaseUsername", replace: dbServerUsername },
@@ -206,8 +210,10 @@ async function setupAzureResources(appName) {
     { search: "webImageName", replace: appName },
   ];
 
+  const parametersFilePath = `${rootDirectory}/infra/main.parameters.json`;
+
   const parametersJSONFile = JSON.parse(
-    fs.readFileSync(`${__dirname}/../infra/main.parameters.json`, "utf8")
+    fs.readFileSync(parametersFilePath, "utf8")
   );
 
   deploymentParametersSearchReplace.forEach((parameter) => {
@@ -215,16 +221,23 @@ async function setupAzureResources(appName) {
   });
 
   fs.writeFileSync(
-    `${__dirname}/../infra/main-replaced.parameters.json`,
+    parametersFilePath,
     JSON.stringify(parametersJSONFile, null, 2)
   );
 
-  debug("Deploying stack to Azure with parameters...", parametersJSONFile);
-  const deployment = terminal(
-    `azd init --environment ${appName} --subscription ${subscriptionId} --location ${location}`
+  debug("Init azd project");
+  const init = terminal(
+    `azd init --cwd ${rootDirectory} --environment ${appName} --subscription ${subscriptionId} --location ${location}`
   );
 
-  debug("Success!", JSON.stringify(deployment, null, 2));
+  debug("Success!", init);
+
+  debug("Deploying stack to Azure with parameters...", parametersJSONFile);
+  const deployment = terminal(
+    `azd provision --cwd ${rootDirectory} --output json`
+  );
+
+  debug("Success!", deployment);
 
   return {
     tenantId,
@@ -236,47 +249,36 @@ async function setupAzureResources(appName) {
 async function main({ rootDirectory, ...rest }) {
   debug("Starting Remix template...", rootDirectory, rest);
 
-  const exampleEnvPath = path.join(rootDirectory, ".env.example");
-  const envPath = path.join(rootDirectory, ".env");
-  const packageJsonPath = path.join(rootDirectory, "package.json");
-  const deployYmlPath = path.join(
-    rootDirectory,
-    ".github",
-    "workflows",
-    "deploy.yml"
-  );
-
   const dirName = path.basename(rootDirectory);
-  const appName = dirName.replace(/-/g, "").slice(0, 12);
+  const appName = dirName.replace(/-/g, "").slice(0, 6) + getRandomString(6);
 
-  debug(`Start creating app with name`, appName);
+  debug(`Start creating app with name`, appName, `in`, rootDirectory);
 
   const { tenantId, subscriptionId, deploymentOutputs } =
-    await setupAzureResources(appName);
+    await setupAzureResources(appName, rootDirectory);
 
   console.log("Deployment", deploymentOutputs);
 
-  setupDatabase(deploymentOutputs);
+  const { database } = await setupDatabase(deploymentOutputs);
 
-  setupGithubWorkflow(
+  await setupGithubWorkflow(
     appName,
     subscriptionId,
     tenantId,
     deploymentOutputs.registryName,
     deploymentOutputs.registryLoginServer,
     deploymentOutputs.databaseConnectionStrings,
-    deployYmlPath
+    rootDirectory
   );
 
-  setupReadme(rootDirectory, appName);
+  setupReadme(appName, rootDirectory);
 
   setupEnvironmentFile(
-    exampleEnvPath,
-    envPath,
-    deploymentOutputs.databaseConnectionStrings
+    deploymentOutputs.databaseConnectionStrings,
+    rootDirectory
   );
 
-  setupPackageJson(packageJsonPath);
+  setupPackageJson(appName, rootDirectory);
 
   await setupGitRepository({ appName: "maxpajtest4" });
 
@@ -286,11 +288,7 @@ async function main({ rootDirectory, ...rest }) {
     `Now commit and push your code to your Github repository and check that the Github Action completes.`
   );
 
-  debug(`Removing temporary files from disk.`);
-
-  await Promise.all([fs.rm(path.join(rootDirectory, "LICENSE.md"))]);
-
-  if (answers.dbType === "devcontainer") {
+  if (database === "devcontainer") {
     debug(
       `Skipping the project setup until you open the devcontainer. Once done, "npm run setup" will execute on your behalf.`
     );
