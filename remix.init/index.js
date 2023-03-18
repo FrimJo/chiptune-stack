@@ -21,7 +21,6 @@ function terminal(str, args = {}) {
   try {
     return JSON.parse(result);
   } catch (e) {
-    console.error(e);
     return result;
   }
 }
@@ -190,7 +189,7 @@ async function setupDatabase(azureDatabaseConnectionStrings) {
 async function setupAzureResources(appName, rootDirectory) {
   const azureSubscriptions = terminal(`az login`);
 
-  debug("Azure login success", azureSubscriptions);
+  debug("Azure login success!");
 
   const dbServerPassword = getRandomPassword();
   const dbServerUsername = appName;
@@ -225,14 +224,12 @@ async function setupAzureResources(appName, rootDirectory) {
     JSON.stringify(parametersJSONFile, null, 2)
   );
 
-  debug("Init azd project");
-  const init = terminal(
+  debug("Inititalizing and deploying, hold on...");
+
+  terminal(
     `azd init --cwd ${rootDirectory} --environment ${appName} --subscription ${subscriptionId} --location ${location}`
   );
 
-  debug("Success!", init);
-
-  debug("Deploying stack to Azure with parameters...", parametersJSONFile);
   const deployment = terminal(
     `azd provision --cwd ${rootDirectory} --output json`
   );
