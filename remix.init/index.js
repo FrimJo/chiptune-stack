@@ -44,55 +44,22 @@ function getRandomPassword(
 }
 
 async function setupGithubWorkflow(
-  appName,
+  environmentName,
   subscriptionId,
-  tenantId,
-  registryName,
-  registryLoginServer,
-  deploymentOutputs,
-  rootDirectory
+  azureLocation
 ) {
-  const deployYmlPath = path.join(
-    rootDirectory,
-    ".github",
-    "workflows",
-    "deploy.yml"
-  );
-
   await inquirer.prompt({
     message: `Set up a repository on GitHub and add the following configuration to your repository Github Actions secrets \n ${JSON.stringify(
       {
-        AZURE_REGISTRY_NAME: registryName,
-        AZURE_REGISTRY_URL: registryLoginServer,
-        DATABASE_CONNECTION_STRING: deploymentOutputs.databaseConnectionStrings,
+        AZURE_ENV_NAME: environmentName,
+        AZURE_LOCATION: azureLocation,
+        AZURE_SUBSCRIPTION_ID: subscriptionId,
       },
       null,
       2
     )}`,
     type: "confirm",
   });
-
-  const deployYmlSearchReplace = [
-    { search: "${AZURE_WEBAPP_NAME}", replace: appName },
-    {
-      search: "${AZURE_REGISTRY_URL}",
-      replace: registryLoginServer,
-    },
-    { search: "${AZURE_SUBSCRIPTION_ID}", replace: subscriptionId },
-    { search: "${AZURE_TENTANT_ID}", replace: tenantId },
-    { search: "${IMAGE_NAME}", replace: appName },
-  ];
-
-  let newDeployYml = fs.readFileSync(deployYmlPath, "utf8");
-
-  deployYmlSearchReplace.forEach((replace) => {
-    newDeployYml = newDeployYml.replace(
-      new RegExp(escapeRegExp(replace.name), "g"),
-      replace.content
-    );
-  });
-
-  fs.writeFileSync(deployYmlPath, newDeployYml);
 }
 
 function setupPackageJson(appName, rootDirectory) {
@@ -241,6 +208,7 @@ async function setupAzureResources(appName, rootDirectory) {
     tenantId,
     subscriptionId,
     deploymentOutputs: deployment.outputs,
+    location,
   };
 }
 
@@ -250,20 +218,12 @@ async function main({ rootDirectory, ...rest }) {
 
   debug(`Start creating Remix app with name`, appName, `in`, rootDirectory);
 
-  const { tenantId, subscriptionId, deploymentOutputs } =
+  const { subscriptionId, deploymentOutputs, location } =
     await setupAzureResources(appName, rootDirectory);
 
   const { database } = await setupDatabase(deploymentOutputs);
 
-  await setupGithubWorkflow(
-    appName,
-    subscriptionId,
-    tenantId,
-    deploymentOutputs.AZURE_CONTAINER_REGISTRY_NAME,
-    deploymentOutputs.AZURE_CONTAINER_REGISTRY_ENDPOINT,
-    deploymentOutputs.AZURE_DATABASE_SERVER_HOST,
-    rootDirectory
-  );
+  await setupGithubWorkflow(appName, subscriptionId, location);
 
   setupReadme(appName, rootDirectory);
 
