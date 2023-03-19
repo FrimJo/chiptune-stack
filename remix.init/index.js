@@ -64,7 +64,7 @@ async function setupGithubWorkflow(
       {
         AZURE_REGISTRY_NAME: registryName,
         AZURE_REGISTRY_URL: registryLoginServer,
-        DATABASE_CONNECTION_STRING: deploymentOutputs.databaseConnectionString,
+        DATABASE_CONNECTION_STRING: deploymentOutputs.databaseConnectionStrings,
       },
       null,
       2
@@ -141,7 +141,7 @@ function setupReadme(appName, rootDirectory) {
   fs.writeFileSync(readmePath, newReadme);
 }
 
-async function setupDatabase(azureDatabaseConnectionStrings) {
+async function setupDatabase(deploymentOutputs) {
   const answers = await inquirer.prompt([
     {
       name: "dbType",
@@ -162,7 +162,7 @@ async function setupDatabase(azureDatabaseConnectionStrings) {
     case "Local":
       const localAnswers = await inquirer.prompt([
         {
-          name: "connStr",
+          name: "connectionString",
           type: "input",
           message: "What is the connection string?",
           default: "postgresql://postgres:postgres@localhost:5432/remix",
@@ -171,15 +171,14 @@ async function setupDatabase(azureDatabaseConnectionStrings) {
 
       return {
         database: "local",
-        connectionString: localAnswers.connStr,
+        connectionString: localAnswers.connectionString,
         shadowConnectionString: null,
       };
     case "Azure":
       return {
         database: "azure",
-        connectionString: azureDatabaseConnectionStrings.connectionString,
-        shadowConnectionString:
-          azureDatabaseConnectionStrings.shadowConnectionString,
+        connectionString: deploymentOutputs.AZURE_DATABASE_SERVER_HOST,
+        shadowConnectionString: deploymentOutputs.AZURE_DATABASE_SERVER_HOST,
       };
     default:
       throw new Error("Unknown dbType");
@@ -202,11 +201,13 @@ async function setupAzureResources(appName, rootDirectory) {
   const location = "northeurope";
 
   const deploymentParametersSearchReplace = [
+    { search: "location", replace: location },
+    { search: "environmentName", replace: appName },
     { search: "webContainerAppName", replace: appName },
     { search: "databasePassword", replace: dbServerPassword },
     { search: "databaseUsername", replace: dbServerUsername },
     { search: "sessionSecret", replace: sessionSecret },
-    { search: "webImageName", replace: appName },
+    { search: "webImageName", replace: "nginx:latest" },
   ];
 
   const parametersFilePath = `${rootDirectory}/infra/main.parameters.json`;
@@ -239,22 +240,18 @@ async function setupAzureResources(appName, rootDirectory) {
   return {
     tenantId,
     subscriptionId,
-    deploymentOutputs: deployment,
+    deploymentOutputs: deployment.outputs,
   };
 }
 
 async function main({ rootDirectory, ...rest }) {
-  debug("Starting Remix template...", rootDirectory, rest);
-
   const dirName = path.basename(rootDirectory);
   const appName = dirName.replace(/-/g, "").slice(0, 6) + getRandomString(6);
 
-  debug(`Start creating app with name`, appName, `in`, rootDirectory);
+  debug(`Start creating Remix app with name`, appName, `in`, rootDirectory);
 
   const { tenantId, subscriptionId, deploymentOutputs } =
     await setupAzureResources(appName, rootDirectory);
-
-  console.log("Deployment", deploymentOutputs);
 
   const { database } = await setupDatabase(deploymentOutputs);
 
@@ -262,16 +259,16 @@ async function main({ rootDirectory, ...rest }) {
     appName,
     subscriptionId,
     tenantId,
-    deploymentOutputs.registryName,
-    deploymentOutputs.registryLoginServer,
-    deploymentOutputs.databaseConnectionStrings,
+    deploymentOutputs.AZURE_CONTAINER_REGISTRY_NAME,
+    deploymentOutputs.AZURE_CONTAINER_REGISTRY_ENDPOINT,
+    deploymentOutputs.AZURE_DATABASE_SERVER_HOST,
     rootDirectory
   );
 
   setupReadme(appName, rootDirectory);
 
   setupEnvironmentFile(
-    deploymentOutputs.databaseConnectionStrings,
+    deploymentOutputs.AZURE_DATABASE_SERVER_HOST,
     rootDirectory
   );
 
