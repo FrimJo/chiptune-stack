@@ -1,8 +1,8 @@
 const { execSync } = require('child_process')
 
-async function assertCommand(command, url) {
+function assertCommand(command, url) {
   try {
-    await execSync(`hash ${command}`, { stdio: 'pipe' })
+    execSync(`hash ${command}`, { stdio: 'pipe' })
   } catch (error) {
     console.log(`Please install '${command}' (${url}) and rerun the command.`)
 
@@ -11,18 +11,60 @@ async function assertCommand(command, url) {
   }
 }
 
-async function setupGitRepository(options) {
-  console.log(`Setting up repository: ${options.appName}... ⏰`)
+async function setupGitRepository(
+  appName,
+  environmentName,
+  azureLocation,
+  subscriptionId,
+  rootDirectory
+) {
+  console.log(`Setting up repository: ${appName}... ⏰`)
 
   // Check for necessary commands exists
-  await assertCommand('git', 'https://git-scm.com/book/en/v2/Getting-Started-Installing-Git')
-  await assertCommand('gh', 'https://cli.github.com/manual/installation')
+  assertCommand('git', 'https://git-scm.com/book/en/v2/Getting-Started-Installing-Git')
+  assertCommand('gh', 'https://cli.github.com/manual/installation')
 
-  await execSync(`gh auth login --hostname github.com --git-protocol https --web`)
-  await execSync(`git init`)
-  await execSync(`git add .`)
-  await execSync(`git commit -m “Initial commit”`)
-  await execSync(`gh repo create ${options.appName} --public --push --source ./`)
+  console.log(`Auth with GitHub...`)
+
+  execSync(`gh auth login --hostname github.com --git-protocol https --web`, {
+    stdio: 'inherit',
+    encoding: 'utf8',
+  })
+  execSync(`git init`, {
+    cwd: rootDirectory,
+  })
+  execSync(`git add .`, {
+    cwd: rootDirectory,
+  })
+  execSync(`git commit -m "Initial commit"`, {
+    cwd: rootDirectory,
+  })
+
+  const user = JSON.parse(execSync(`gh api user`))
+  const repoOwner = user.login
+
+  execSync(`GH_DEBUG=1 gh repo create ${appName} --private --push --source ${rootDirectory}`, {
+    cwd: rootDirectory,
+  })
+
+  execSync(
+    `GH_DEBUG=1 gh secret set AZURE_ENV_NAME --body ${environmentName} --repos ${repoOwner}/${appName}`,
+    {
+      cwd: rootDirectory,
+    }
+  )
+  execSync(
+    `GH_DEBUG=1 gh secret set AZURE_LOCATION --body ${azureLocation} --repos ${repoOwner}/${appName}`,
+    {
+      cwd: rootDirectory,
+    }
+  )
+  execSync(
+    `GH_DEBUG=1 gh secret set AZURE_SUBSCRIPTION_ID --body ${subscriptionId} --repos ${repoOwner}/${appName}`,
+    {
+      cwd: rootDirectory,
+    }
+  )
 
   console.log(`Successfully setup repository 🎉`)
 }
