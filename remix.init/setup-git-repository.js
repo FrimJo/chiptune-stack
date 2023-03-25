@@ -40,31 +40,11 @@ async function setupGitRepository(
     cwd: rootDirectory,
   })
 
-  const user = JSON.parse(execSync(`gh api user`))
-  const repoOwner = user.login
-
   execSync(`GH_DEBUG=1 gh repo create ${appName} --private --push --source ${rootDirectory}`, {
     cwd: rootDirectory,
   })
 
-  execSync(
-    `GH_DEBUG=1 gh secret set AZURE_ENV_NAME --body ${environmentName} --repos ${repoOwner}/${appName}`,
-    {
-      cwd: rootDirectory,
-    }
-  )
-  execSync(
-    `GH_DEBUG=1 gh secret set AZURE_LOCATION --body ${azureLocation} --repos ${repoOwner}/${appName}`,
-    {
-      cwd: rootDirectory,
-    }
-  )
-  execSync(
-    `GH_DEBUG=1 gh secret set AZURE_SUBSCRIPTION_ID --body ${subscriptionId} --repos ${repoOwner}/${appName}`,
-    {
-      cwd: rootDirectory,
-    }
-  )
+  execSync(`azd pipeline config`)
 
   console.log(`Successfully setup repository 🎉`)
 }

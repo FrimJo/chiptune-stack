@@ -142,6 +142,8 @@ jobs:
     # only build/deploy main branch on pushes
     if: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name == 'push' }}
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/azure-dev-cli-apps:latest
     permissions: write-all
     steps:
       - name: 🛑 Cancel Previous Runs
@@ -153,7 +155,9 @@ jobs:
       - name: Log in with Azure
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Azure Dev Provision
         run: azd provision --no-prompt
@@ -165,6 +169,8 @@ jobs:
   deploy:
     name: 🚀 Deploy
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/azure-dev-cli-apps:latest
     needs: [lint, typecheck, vitest, cypress, provision]
     # only build/deploy main branch on pushes
     if: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event_name == 'push' }}
@@ -176,7 +182,9 @@ jobs:
       - name: 🔓 Azure authentication
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Azure Dev Deploy
         run: azd deploy --no-prompt
