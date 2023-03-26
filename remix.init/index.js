@@ -50,7 +50,7 @@ async function setupPackageJson(appName, rootDirectory) {
   const newPackageJson =
     JSON.stringify(sort({ ...JSON.parse(packageJson), name: appName }), null, 2) + '\n'
 
-  await fs.writeFile(packageJsonPath, newPackageJson)
+  await fs.writeFile(packageJsonPath, newPackageJson, { encoding: 'utf8' })
   debug('Done setting up package.json file')
 }
 
@@ -71,7 +71,10 @@ async function setupEnvironmentFile(databaseConnectionStrings, rootDirectory) {
     newEnv += `${EOL}SHADOW_DATABASE_URL="${databaseConnectionStrings.shadowConnectionString}"`
   }
 
-  await fs.writeFile(envPath, newEnv)
+  await fs.writeFile(envPath, newEnv, {
+    encoding: 'utf8',
+  })
+
   debug('Done setting up .env file')
 }
 
@@ -85,7 +88,9 @@ async function setupReadme(appName, rootDirectory) {
     appName
   )
 
-  await fs.writeFile(readmePath, newReadme)
+  await fs.writeFile(readmePath, newReadme, {
+    encoding: 'utf8',
+  })
   debug('Done setting up README')
 }
 
@@ -170,7 +175,9 @@ async function setupAzureResources(appName, rootDirectory) {
     parametersJSONFile.parameters[parameter.search].value = parameter.replace
   })
 
-  await fs.writeFile(parametersFilePath, JSON.stringify(parametersJSONFile, null, 2))
+  await fs.writeFile(parametersFilePath, JSON.stringify(parametersJSONFile, null, 2), {
+    encoding: 'utf8',
+  })
 
   debug('Inititalizing and deploying, hold on...')
 
