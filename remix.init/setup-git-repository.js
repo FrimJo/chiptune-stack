@@ -44,7 +44,11 @@ async function setupGitRepository(
     cwd: rootDirectory,
   })
 
-  execSync(`azd pipeline config`)
+  execSync(`azd pipeline config`, {
+    stdio: 'inherit',
+    encoding: 'utf8',
+    cwd: rootDirectory,
+  })
 
   console.log(`Successfully setup repository 🎉`)
 }
