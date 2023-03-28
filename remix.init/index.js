@@ -54,7 +54,15 @@ async function setupPackageJson(appName, rootDirectory) {
   debug('Done setting up package.json file')
 }
 
-async function setupEnvironmentFile(databaseConnectionStrings, rootDirectory) {
+function buildConnectionString(protocol, uri, database, username, password) {
+  return `${protocol}://${username}:${password}@${uri}/${database}`
+}
+
+async function setupEnvironmentFile(
+  databaseConnectionString,
+  shadowConnectionString,
+  rootDirectory
+) {
   debug('Start setting up .env file')
   const exampleEnvPath = path.join(rootDirectory, '.env.example')
   const envPath = path.join(rootDirectory, '.env')
@@ -62,13 +70,10 @@ async function setupEnvironmentFile(databaseConnectionStrings, rootDirectory) {
 
   let newEnv = env.replace(/^SESSION_SECRET=.*$/m, `SESSION_SECRET="${getRandomString(16)}"`)
 
-  newEnv = newEnv.replace(
-    /^DATABASE_URL=.*$/m,
-    `DATABASE_URL="${databaseConnectionStrings.connectionString}"`
-  )
+  newEnv = newEnv.replace(/^DATABASE_URL=.*$/m, `DATABASE_URL="${databaseConnectionString}"`)
 
-  if (databaseConnectionStrings.shadowConnectionString) {
-    newEnv += `${EOL}SHADOW_DATABASE_URL="${databaseConnectionStrings.shadowConnectionString}"`
+  if (shadowConnectionString) {
+    newEnv += `${EOL}SHADOW_DATABASE_URL="${shadowConnectionString}"`
   }
 
   await fs.writeFile(envPath, newEnv, {
@@ -192,10 +197,8 @@ async function setupAzureResources(appName, rootDirectory) {
   debug('Done setting up Azure resources')
 
   return {
-    tenantId,
-    subscriptionId,
     deploymentOutputs: deployment.outputs,
-    location,
+    dbServerPassword,
   }
 }
 
@@ -211,12 +214,27 @@ async function main({ rootDirectory }) {
 
   debug(`Start creating Remix app with name`, appName, `in`, rootDirectory)
 
-  const { subscriptionId, deploymentOutputs, location } = await setupAzureResources(
-    appName,
+  const { deploymentOutputs, dbServerPassword } = await setupAzureResources(appName, rootDirectory)
+
+  const { database } = await setupDatabase(deploymentOutputs)
+
+  await setupReadme(appName, rootDirectory)
+
+  debug(deploymentOutputs)
+
+  await setupEnvironmentFile(
+    buildConnectionString(
+      'postgres',
+      deploymentOutputs.AZURE_DATABASE_SERVER_HOST.value,
+      deploymentOutputs.AZURE_DATABASE_NAME.value,
+      deploymentOutputs.AZURE_DATABASE_USERNAME.value,
+      dbServerPassword
+    ),
+    '',
     rootDirectory
   )
 
-  const { database } = await setupDatabase(deploymentOutputs)
+  await setupPackageJson(appName, rootDirectory)
 
   setupReadme(appName, rootDirectory)
 
