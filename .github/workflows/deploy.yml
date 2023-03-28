@@ -101,7 +101,7 @@ jobs:
           - 5432:5432
 
     env:
-      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/remix'
+      DATABASE_CONNECTION_STRING: 'postgresql://postgres:postgres@localhost:5432/remix'
       SESSION_SECRET: super-duper-s3cret
 
     steps:

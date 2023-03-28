@@ -79,10 +79,13 @@ async function setupEnvironmentFile(
 
   let newEnv = env.replace(/^SESSION_SECRET=.*$/m, `SESSION_SECRET="${getRandomString(16)}"`)
 
-  newEnv = newEnv.replace(/^DATABASE_URL=.*$/m, `DATABASE_URL="${databaseConnectionString}"`)
+  newEnv = newEnv.replace(
+    /^DATABASE_CONNECTION_STRING=.*$/m,
+    `DATABASE_CONNECTION_STRING="${databaseConnectionString}"`
+  )
 
   if (shadowConnectionString) {
-    newEnv += `${EOL}SHADOW_DATABASE_URL="${shadowConnectionString}"`
+    newEnv += `${EOL}SHADOW_DATABASE_CONNECTION_STRING="${shadowConnectionString}"`
   }
 
   await fs.writeFile(envPath, newEnv, {
@@ -108,7 +111,7 @@ async function setupReadme(appName, rootDirectory) {
   debug('Done setting up README')
 }
 
-async function setupDatabase(deploymentOutputs) {
+async function setupDatabase(deploymentOutputs, dbServerPassword) {
   debug('Start setting up database connection')
 
   const answers = await inquirer.prompt([
@@ -146,8 +149,14 @@ async function setupDatabase(deploymentOutputs) {
     case 'Azure':
       return {
         database: 'azure',
-        connectionString: deploymentOutputs.AZURE_DATABASE_SERVER_HOST,
-        shadowConnectionString: deploymentOutputs.AZURE_DATABASE_SERVER_HOST,
+        connectionString: buildConnectionString(
+          'postgres',
+          deploymentOutputs.AZURE_DATABASE_SERVER_HOST.value,
+          deploymentOutputs.AZURE_DATABASE_NAME.value,
+          deploymentOutputs.AZURE_DATABASE_USERNAME.value,
+          dbServerPassword
+        ),
+        shadowConnectionString: '',
       }
     default:
       throw new Error('Unknown dbType')
@@ -234,21 +243,14 @@ async function main({ rootDirectory }) {
 
   const { deploymentOutputs, dbServerPassword } = await setupAzureResources(appName, rootDirectory)
 
-  const { database } = await setupDatabase(deploymentOutputs)
+  const { database, connectionString, shadowConnectionString } = await setupDatabase(
+    deploymentOutputs,
+    dbServerPassword
+  )
 
   await setupReadme(appName, rootDirectory)
 
-  await setupEnvironmentFile(
-    buildConnectionString(
-      'postgres',
-      deploymentOutputs.AZURE_DATABASE_SERVER_HOST.value,
-      deploymentOutputs.AZURE_DATABASE_NAME.value,
-      deploymentOutputs.AZURE_DATABASE_USERNAME.value,
-      dbServerPassword
-    ),
-    '',
-    rootDirectory
-  )
+  await setupEnvironmentFile(connectionString, shadowConnectionString, rootDirectory)
 
   await setupPackageJson(appName, rootDirectory)
 
