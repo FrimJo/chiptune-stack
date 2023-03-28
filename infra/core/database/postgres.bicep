@@ -5,8 +5,8 @@ param administratorLoginPassword string
 param location string = resourceGroup().location
 param serverName string
 param serverEdition string = 'GeneralPurpose'
-param skuSizeGB int = 128
-param dbInstanceType string = 'Standard_D4ds_v4'
+param skuSizeGB int = 32
+param dbInstanceType string = 'Standard_B1ms'
 param haMode string = 'Disabled'
 param availabilityZone string = '1'
 param version string = '13'
