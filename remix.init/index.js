@@ -6,9 +6,18 @@ const inquirer = require('inquirer')
 const { EOL } = require('os')
 const sort = require('sort-package-json')
 
-const setupGitRepository = require('./setup-git-repository')
-
 const debugMode = true
+
+function assertCommand(command, url) {
+  try {
+    execSync(`hash ${command}`, { stdio: 'pipe' })
+  } catch (error) {
+    console.log(`Please install '${command}' (${url}) and rerun the command.`)
+
+    // Terminate setup process
+    process.exit(0)
+  }
+}
 
 function debug(...str) {
   if (debugMode) {
@@ -156,10 +165,7 @@ async function setupAzureResources(appName, rootDirectory) {
   const dbServerUsername = appName
 
   const subscriptionId = azureSubscriptions[0].id
-  const tenantId = azureSubscriptions[0].tenantId
-
   const sessionSecret = getRandomString(16)
-
   const location = 'northeurope'
 
   const deploymentParametersSearchReplace = [
@@ -203,6 +209,10 @@ async function setupAzureResources(appName, rootDirectory) {
 }
 
 async function main({ rootDirectory }) {
+  // Check for necessary commands exists
+  assertCommand('git', 'https://git-scm.com/book/en/v2/Getting-Started-Installing-Git')
+  assertCommand('gh', 'https://cli.github.com/manual/installation')
+
   const pathsToRemove = ['LICENSE.md', '.git']
 
   await Promise.all(
@@ -220,8 +230,6 @@ async function main({ rootDirectory }) {
 
   await setupReadme(appName, rootDirectory)
 
-  debug(deploymentOutputs)
-
   await setupEnvironmentFile(
     buildConnectionString(
       'postgres',
@@ -236,7 +244,11 @@ async function main({ rootDirectory }) {
 
   await setupPackageJson(appName, rootDirectory)
 
-  setupReadme(appName, rootDirectory)
+  execSync(`azd pipeline config`, {
+    stdio: 'inherit',
+    encoding: 'utf8',
+    cwd: rootDirectory,
+  })
 
   setupEnvironmentFile(deploymentOutputs.AZURE_DATABASE_SERVER_HOST, rootDirectory)
 
