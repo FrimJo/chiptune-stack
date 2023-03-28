@@ -154,6 +154,14 @@ async function setupDatabase(deploymentOutputs) {
   }
 }
 
+async function setupAzureDev(rootDirectory) {
+  execSync(`azd pipeline config`, {
+    stdio: 'inherit',
+    encoding: 'utf8',
+    cwd: rootDirectory,
+  })
+}
+
 async function setupAzureResources(appName, rootDirectory) {
   debug('Start setting up Azure resources')
 
@@ -244,11 +252,7 @@ async function main({ rootDirectory }) {
 
   await setupPackageJson(appName, rootDirectory)
 
-  execSync(`azd pipeline config`, {
-    stdio: 'inherit',
-    encoding: 'utf8',
-    cwd: rootDirectory,
-  })
+  await setupAzureDev(rootDirectory)
 
   setupEnvironmentFile(deploymentOutputs.AZURE_DATABASE_SERVER_HOST, rootDirectory)
 
