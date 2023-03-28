@@ -224,11 +224,7 @@ async function main({ rootDirectory }) {
 
   setupPackageJson(appName, rootDirectory)
 
-  await setupGitRepository(appName, appName, location, subscriptionId, rootDirectory)
-
-  debug(
-    `Now commit and push your code to your Github repository and check that the Github Action completes.`
-  )
+  await setupGitRepository(appName, rootDirectory)
 
   if (database === 'devcontainer') {
     debug(
