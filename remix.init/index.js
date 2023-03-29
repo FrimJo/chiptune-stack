@@ -52,6 +52,11 @@ function getRandomPassword(
     .join('')
 }
 
+async function assertInstalledTools() {
+  assertCommand('git', 'https://git-scm.com/book/en/v2/Getting-Started-Installing-Git')
+  assertCommand('gh', 'https://cli.github.com/manual/installation')
+}
+
 async function setupPackageJson(appName, rootDirectory) {
   debug('Start setting up package.json file')
   const packageJsonPath = path.join(rootDirectory, 'package.json')
@@ -225,19 +230,19 @@ async function setupAzureResources(appName, rootDirectory) {
   }
 }
 
-async function main({ rootDirectory }) {
-  // Check for necessary commands exists
-  assertCommand('git', 'https://git-scm.com/book/en/v2/Getting-Started-Installing-Git')
-  assertCommand('gh', 'https://cli.github.com/manual/installation')
-
-  const pathsToRemove = ['LICENSE.md', '.git']
-
+async function removeFiles(pathsToRemove, rootDirectory) {
   await Promise.all(
     pathsToRemove.map((p) => fs.rm(path.join(rootDirectory, p), { recursive: true, force: true }))
   )
+}
 
-  const dirName = path.basename(rootDirectory)
-  const appName = dirName.replace(/-/g, '').slice(0, 6) + getRandomString(6)
+async function main({ rootDirectory }) {
+  await removeFiles(['LICENSE.md', '.git'], rootDirectory)
+
+  // Check for necessary commands exists
+  await assertInstalledTools()
+
+  const appName = path.basename(rootDirectory).replace(/-/g, '').slice(0, 6) + getRandomString(6)
 
   debug(`Start creating Remix app with name`, appName, `in`, rootDirectory)
 
