@@ -100,7 +100,7 @@ jobs:
           - 5432:5432
 
     env:
-      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/remix"
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/remix'
       SESSION_SECRET: super-duper-s3cret
 
     steps:
@@ -133,9 +133,9 @@ jobs:
         uses: cypress-io/github-action@v3
         with:
           start: npm run start:mocks
-          wait-on: "http://localhost:8811"
+          wait-on: 'http://localhost:8811'
         env:
-          PORT: "8811"
+          PORT: '8811'
 
   provision:
     name: ☁️ Provision
