@@ -6,6 +6,8 @@ const inquirer = require('inquirer')
 const { EOL } = require('os')
 const sort = require('sort-package-json')
 
+const setupEasyAuth = require('./setup-easy-auth')
+
 const debugMode = true
 
 function assertCommand(command, url) {
@@ -176,7 +178,7 @@ async function setupAzureDev(rootDirectory) {
   })
 }
 
-async function setupAzureResources(appName, rootDirectory) {
+async function setupAzureResources(appName, rootDirectory, identityProviders) {
   debug('Start setting up Azure resources')
 
   const azureSubscriptions = terminal(`az login`)
@@ -199,6 +201,13 @@ async function setupAzureResources(appName, rootDirectory) {
     { search: 'sessionSecret', replace: sessionSecret },
     { search: 'webImageName', replace: 'nginx:latest' },
   ]
+
+  if (identityProviders.google) {
+    deploymentParametersSearchReplace.push(
+      { search: 'googleClientId', replace: identityProviders.google.clientId },
+      { search: 'googleClientSecret', replace: identityProviders.google.clientSecret }
+    )
+  }
 
   const parametersFilePath = `${rootDirectory}/infra/main.parameters.json`
 
@@ -246,7 +255,23 @@ async function main({ rootDirectory }) {
 
   debug(`Start creating Remix app with name`, appName, `in`, rootDirectory)
 
-  const { deploymentOutputs, dbServerPassword } = await setupAzureResources(appName, rootDirectory)
+  // Check if user wants to add authentication
+  const answer = await inquirer.prompt({
+    name: 'provider',
+    message: 'Add Google as authentication provider?',
+    type: 'confirm',
+    default: true,
+  })
+
+  let identityProviders
+  if (answer.provider) {
+    identityProviders = await setupEasyAuth({ url: 'https://todo.replace.me' })
+  }
+  const { deploymentOutputs, dbServerPassword } = await setupAzureResources(
+    appName,
+    rootDirectory,
+    identityProviders
+  )
 
   const { database, connectionString, shadowConnectionString } = await setupDatabase(
     deploymentOutputs,
@@ -264,8 +289,6 @@ async function main({ rootDirectory }) {
   setupEnvironmentFile(deploymentOutputs.AZURE_DATABASE_SERVER_HOST, rootDirectory)
 
   setupPackageJson(appName, rootDirectory)
-
-  await setupGitRepository(appName, rootDirectory)
 
   if (database === 'devcontainer') {
     debug(
