@@ -11,6 +11,7 @@ param imageName string
 param keyVaultName string = ''
 param managedIdentity bool = !empty(keyVaultName)
 param targetPort int = 80
+param useIdentityProviders bool = false
 
 @description('CPU cores allocated to a single container instance, e.g. 0.5')
 param containerCpuCoreCount string = '0.5'
@@ -113,7 +114,7 @@ resource authSettings 'Microsoft.App/containerApps/authConfigs@2022-10-01' = {
       }
     }
     platform: {
-      enabled: true
+      enabled: useIdentityProviders
     }
   }
 }

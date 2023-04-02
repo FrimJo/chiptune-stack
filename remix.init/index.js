@@ -178,7 +178,7 @@ async function setupAzureDev(rootDirectory) {
   })
 }
 
-async function setupAzureResources(appName, rootDirectory, identityProviders) {
+async function setupAzureResources(appName, rootDirectory) {
   debug('Start setting up Azure resources')
 
   const azureSubscriptions = terminal(`az login`)
@@ -201,13 +201,6 @@ async function setupAzureResources(appName, rootDirectory, identityProviders) {
     { search: 'sessionSecret', replace: sessionSecret },
     { search: 'webImageName', replace: 'nginx:latest' },
   ]
-
-  if (identityProviders.google) {
-    deploymentParametersSearchReplace.push(
-      { search: 'googleClientId', replace: identityProviders.google.clientId },
-      { search: 'googleClientSecret', replace: identityProviders.google.clientSecret }
-    )
-  }
 
   const parametersFilePath = `${rootDirectory}/infra/main.parameters.json`
 
@@ -239,6 +232,20 @@ async function setupAzureResources(appName, rootDirectory, identityProviders) {
   }
 }
 
+async function setupIdentityProviders(rootDirectory, providers) {
+  if (providers.google) {
+    const parametersWebJSONFile = `${rootDirectory}/infra/app/web.parameters.json`
+    const webParametersJSONFile = JSON.parse(await fs.readFile(parametersWebJSONFile, 'utf8'))
+    webParametersJSONFile.parameters['googleClientId'].value = providers.google.clientId
+    webParametersJSONFile.parameters['googleClientSecret'].value = providers.google.clientSecret
+    webParametersJSONFile.parameters['useIdentityProviders'].value = true
+
+    await fs.writeFile(webParametersJSONFile, JSON.stringify(parametersWebJSONFile, null, 2), {
+      encoding: 'utf8',
+    })
+  }
+}
+
 async function removeFiles(pathsToRemove, rootDirectory) {
   await Promise.all(
     pathsToRemove.map((p) => fs.rm(path.join(rootDirectory, p), { recursive: true, force: true }))
@@ -263,15 +270,14 @@ async function main({ rootDirectory }) {
     default: true,
   })
 
-  let identityProviders
+  const { deploymentOutputs, dbServerPassword } = await setupAzureResources(appName, rootDirectory)
+
   if (answer.provider) {
-    identityProviders = await setupEasyAuth({ url: 'https://todo.replace.me' })
+    const identityProviders = await setupEasyAuth({
+      url: deploymentOutputs.REACT_APP_WEB_BASE_URL.value,
+    })
+    await setupIdentityProviders(rootDirectory, identityProviders)
   }
-  const { deploymentOutputs, dbServerPassword } = await setupAzureResources(
-    appName,
-    rootDirectory,
-    identityProviders
-  )
 
   const { database, connectionString, shadowConnectionString } = await setupDatabase(
     deploymentOutputs,

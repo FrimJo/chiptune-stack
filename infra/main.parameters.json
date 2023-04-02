@@ -22,12 +22,6 @@
     },
     "sessionSecret": {
       "value": "${SESSION_SECRET}"
-    },
-    "googleClientId": {
-      "value": "${GOOGLE_CLIENT_ID}"
-    },
-    "googleClientSecret": {
-      "value": "${GOOGLE_CLIENT_SECRET}"
     }
   }
 }
