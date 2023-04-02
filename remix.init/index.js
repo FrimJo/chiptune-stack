@@ -233,6 +233,8 @@ async function setupAzureResources(appName, rootDirectory) {
 }
 
 async function setupIdentityProviders(rootDirectory, providers) {
+  debug('Start setting up identity providers')
+
   if (providers.google) {
     const parametersWebJSONFile = `${rootDirectory}/infra/app/web.parameters.json`
     const webParametersJSONFile = JSON.parse(await fs.readFile(parametersWebJSONFile, 'utf8'))
@@ -243,6 +245,12 @@ async function setupIdentityProviders(rootDirectory, providers) {
     await fs.writeFile(webParametersJSONFile, JSON.stringify(parametersWebJSONFile, null, 2), {
       encoding: 'utf8',
     })
+
+    debug('Deploying authentication, hold on...')
+
+    const deployment = terminal(`azd provision --cwd ${rootDirectory} --output json`)
+
+    debug('Success!', deployment)
   }
 }
 
