@@ -2,9 +2,9 @@ import type { LoaderArgs } from '@remix-run/node'
 import { json } from '@remix-run/node'
 import { Form, Link, NavLink, Outlet, useLoaderData } from '@remix-run/react'
 
+import { getNoteListItems } from '~/models/note.server'
 import { requireUserId } from '~/session.server'
 import { useUser } from '~/utils'
-import { getNoteListItems } from '~/models/note.server'
 
 export async function loader({ request }: LoaderArgs) {
   const userId = await requireUserId(request)
@@ -22,7 +22,7 @@ export default function NotesPage() {
         <h1 className="text-3xl font-bold">
           <Link to=".">Notes</Link>
         </h1>
-        <p>{user.email}</p>
+        <p>{user.name}</p>
         <Form action="/logout" method="post">
           <button
             type="submit"
