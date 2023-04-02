@@ -33,7 +33,7 @@ services:
     ports:
       - 3000:3000
     environment:
-      DATABASE_URL: 'postgresql://postgres:$AzureR0cks!@db:5432/remix'
+      DATABASE_CONNECTION_STRING: 'postgresql://postgres:$AzureR0cks!@db:5432/remix'
     links:
       - db
 

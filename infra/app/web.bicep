@@ -31,7 +31,7 @@ module app '../core/host/container-app.bicep' = {
         value: applicationInsights.properties.ConnectionString
       }
       {
-        name: 'DATABASE_URL'
+        name: 'DATABASE_CONNECTION_STRING'
         value: 'postgresql://${databaseUsername}:${databasePassword}@${databaseServerHost}/${databaseName}'
       }
       {

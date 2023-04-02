@@ -1,14 +1,23 @@
 const { execSync } = require('child_process')
 const crypto = require('crypto')
-const fs = require('fs')
+const fs = require('fs/promises')
 const path = require('path')
 const inquirer = require('inquirer')
 const { EOL } = require('os')
 const sort = require('sort-package-json')
 
-const setupGitRepository = require('./setup-git-repository')
-
 const debugMode = true
+
+function assertCommand(command, url) {
+  try {
+    execSync(`hash ${command}`, { stdio: 'pipe' })
+  } catch (error) {
+    console.log(`Please install '${command}' (${url}) and rerun the command.`)
+
+    // Terminate setup process
+    process.exit(0)
+  }
+}
 
 function debug(...str) {
   if (debugMode) {
@@ -43,61 +52,73 @@ function getRandomPassword(
     .join('')
 }
 
-async function setupGithubWorkflow(environmentName, subscriptionId, azureLocation) {
-  await inquirer.prompt({
-    message: `Set up a repository on GitHub and add the following configuration to your repository Github Actions secrets \n ${JSON.stringify(
-      {
-        AZURE_ENV_NAME: environmentName,
-        AZURE_LOCATION: azureLocation,
-        AZURE_SUBSCRIPTION_ID: subscriptionId,
-      },
-      null,
-      2
-    )}`,
-    type: 'confirm',
-  })
+async function assertInstalledTools() {
+  assertCommand('git', 'https://git-scm.com/book/en/v2/Getting-Started-Installing-Git')
+  assertCommand('gh', 'https://cli.github.com/manual/installation')
 }
 
-function setupPackageJson(appName, rootDirectory) {
+async function setupPackageJson(appName, rootDirectory) {
+  debug('Start setting up package.json file')
   const packageJsonPath = path.join(rootDirectory, 'package.json')
-  const packageJson = fs.readFileSync(packageJsonPath, 'utf8')
+  const packageJson = await fs.readFile(packageJsonPath, 'utf8')
   const newPackageJson =
     JSON.stringify(sort({ ...JSON.parse(packageJson), name: appName }), null, 2) + '\n'
 
-  fs.writeFileSync(packageJsonPath, newPackageJson)
+  await fs.writeFile(packageJsonPath, newPackageJson, { encoding: 'utf8' })
+  debug('Done setting up package.json file')
 }
 
-function setupEnvironmentFile(databaseConnectionStrings, rootDirectory) {
+function buildConnectionString(protocol, uri, database, username, password) {
+  return `${protocol}://${username}:${password}@${uri}/${database}`
+}
+
+async function setupEnvironmentFile(
+  databaseConnectionString,
+  shadowConnectionString,
+  rootDirectory
+) {
+  debug('Start setting up .env file')
   const exampleEnvPath = path.join(rootDirectory, '.env.example')
   const envPath = path.join(rootDirectory, '.env')
-  const env = fs.readFileSync(exampleEnvPath, 'utf8')
+  const env = await fs.readFile(exampleEnvPath, 'utf8')
 
   let newEnv = env.replace(/^SESSION_SECRET=.*$/m, `SESSION_SECRET="${getRandomString(16)}"`)
 
   newEnv = newEnv.replace(
-    /^DATABASE_URL=.*$/m,
-    `DATABASE_URL="${databaseConnectionStrings.connectionString}"`
+    /^DATABASE_CONNECTION_STRING=.*$/m,
+    `DATABASE_CONNECTION_STRING="${databaseConnectionString}"`
   )
 
-  if (databaseConnectionStrings.shadowConnectionString) {
-    newEnv += `${EOL}SHADOW_DATABASE_URL="${databaseConnectionStrings.shadowConnectionString}"`
+  if (shadowConnectionString) {
+    newEnv += `${EOL}SHADOW_DATABASE_CONNECTION_STRING="${shadowConnectionString}"`
   }
 
-  fs.writeFileSync(envPath, newEnv)
+  await fs.writeFile(envPath, newEnv, {
+    encoding: 'utf8',
+  })
+
+  debug('Done setting up .env file')
 }
 
-function setupReadme(appName, rootDirectory) {
+async function setupReadme(appName, rootDirectory) {
+  debug('Start setting up README')
+
   const readmePath = path.join(rootDirectory, 'README.md')
-  const readme = fs.readFileSync(readmePath, 'utf8')
+  const readme = await fs.readFile(readmePath, 'utf8')
   const newReadme = readme.replace(
     new RegExp(escapeRegExp('chiptune-stack-template'), 'g'),
     appName
   )
 
-  fs.writeFileSync(readmePath, newReadme)
+  await fs.writeFile(readmePath, newReadme, {
+    encoding: 'utf8',
+  })
+  debug('Done setting up README')
 }
 
-async function setupDatabase(deploymentOutputs) {
+async function setupDatabase(deploymentOutputs, dbServerPassword) {
+  debug('Start setting up database connection')
+
   const answers = await inquirer.prompt([
     {
       name: 'dbType',
@@ -133,15 +154,31 @@ async function setupDatabase(deploymentOutputs) {
     case 'Azure':
       return {
         database: 'azure',
-        connectionString: deploymentOutputs.AZURE_DATABASE_SERVER_HOST,
-        shadowConnectionString: deploymentOutputs.AZURE_DATABASE_SERVER_HOST,
+        connectionString: buildConnectionString(
+          'postgres',
+          deploymentOutputs.AZURE_DATABASE_SERVER_HOST.value,
+          deploymentOutputs.AZURE_DATABASE_NAME.value,
+          deploymentOutputs.AZURE_DATABASE_USERNAME.value,
+          dbServerPassword
+        ),
+        shadowConnectionString: '',
       }
     default:
       throw new Error('Unknown dbType')
   }
 }
 
+async function setupAzureDev(rootDirectory) {
+  execSync(`azd pipeline config`, {
+    stdio: 'inherit',
+    encoding: 'utf8',
+    cwd: rootDirectory,
+  })
+}
+
 async function setupAzureResources(appName, rootDirectory) {
+  debug('Start setting up Azure resources')
+
   const azureSubscriptions = terminal(`az login`)
 
   debug('Azure login success!')
@@ -150,10 +187,7 @@ async function setupAzureResources(appName, rootDirectory) {
   const dbServerUsername = appName
 
   const subscriptionId = azureSubscriptions[0].id
-  const tenantId = azureSubscriptions[0].tenantId
-
   const sessionSecret = getRandomString(16)
-
   const location = 'northeurope'
 
   const deploymentParametersSearchReplace = [
@@ -168,13 +202,15 @@ async function setupAzureResources(appName, rootDirectory) {
 
   const parametersFilePath = `${rootDirectory}/infra/main.parameters.json`
 
-  const parametersJSONFile = JSON.parse(fs.readFileSync(parametersFilePath, 'utf8'))
+  const parametersJSONFile = JSON.parse(await fs.readFile(parametersFilePath, 'utf8'))
 
   deploymentParametersSearchReplace.forEach((parameter) => {
     parametersJSONFile.parameters[parameter.search].value = parameter.replace
   })
 
-  fs.writeFileSync(parametersFilePath, JSON.stringify(parametersJSONFile, null, 2))
+  await fs.writeFile(parametersFilePath, JSON.stringify(parametersJSONFile, null, 2), {
+    encoding: 'utf8',
+  })
 
   debug('Inititalizing and deploying, hold on...')
 
@@ -186,42 +222,50 @@ async function setupAzureResources(appName, rootDirectory) {
 
   debug('Success!', deployment)
 
+  debug('Done setting up Azure resources')
+
   return {
-    tenantId,
-    subscriptionId,
     deploymentOutputs: deployment.outputs,
-    location,
+    dbServerPassword,
   }
 }
 
-async function main({ rootDirectory, ...rest }) {
-  const dirName = path.basename(rootDirectory)
-  const appName = dirName.replace(/-/g, '').slice(0, 6) + getRandomString(6)
+async function removeFiles(pathsToRemove, rootDirectory) {
+  await Promise.all(
+    pathsToRemove.map((p) => fs.rm(path.join(rootDirectory, p), { recursive: true, force: true }))
+  )
+}
+
+async function main({ rootDirectory }) {
+  await removeFiles(['LICENSE.md', '.git'], rootDirectory)
+
+  // Check for necessary commands exists
+  await assertInstalledTools()
+
+  const appName = path.basename(rootDirectory).replace(/-/g, '').slice(0, 6) + getRandomString(6)
 
   debug(`Start creating Remix app with name`, appName, `in`, rootDirectory)
 
-  const { subscriptionId, deploymentOutputs, location } = await setupAzureResources(
-    appName,
-    rootDirectory
+  const { deploymentOutputs, dbServerPassword } = await setupAzureResources(appName, rootDirectory)
+
+  const { database, connectionString, shadowConnectionString } = await setupDatabase(
+    deploymentOutputs,
+    dbServerPassword
   )
 
-  const { database } = await setupDatabase(deploymentOutputs)
+  await setupReadme(appName, rootDirectory)
 
-  await setupGithubWorkflow(appName, subscriptionId, location)
+  await setupEnvironmentFile(connectionString, shadowConnectionString, rootDirectory)
 
-  setupReadme(appName, rootDirectory)
+  await setupPackageJson(appName, rootDirectory)
+
+  await setupAzureDev(rootDirectory)
 
   setupEnvironmentFile(deploymentOutputs.AZURE_DATABASE_SERVER_HOST, rootDirectory)
 
   setupPackageJson(appName, rootDirectory)
 
-  await setupGitRepository({ appName: 'maxpajtest4' })
-
-  await Promise.all([fs.rm(path.join(rootDirectory, 'LICENSE.md'))])
-
-  debug(
-    `Now commit and push your code to your Github repository and check that the Github Action completes.`
-  )
+  await setupGitRepository(appName, rootDirectory)
 
   if (database === 'devcontainer') {
     debug(
