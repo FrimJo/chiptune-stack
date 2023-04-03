@@ -265,8 +265,6 @@ async function main({ rootDirectory }) {
 
   setupPackageJson(appName, rootDirectory)
 
-  await setupGitRepository(appName, rootDirectory)
-
   if (database === 'devcontainer') {
     debug(
       `Skipping the project setup until you open the devcontainer. Once done, "npm run setup" will execute on your behalf.`
