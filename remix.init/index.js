@@ -6,6 +6,8 @@ const inquirer = require('inquirer')
 const { EOL } = require('os')
 const sort = require('sort-package-json')
 
+const setupEasyAuth = require('./setup-easy-auth')
+
 const debugMode = true
 
 function assertCommand(command, url) {
@@ -230,6 +232,28 @@ async function setupAzureResources(appName, rootDirectory) {
   }
 }
 
+async function setupIdentityProviders(rootDirectory, providers) {
+  debug('Start setting up identity providers')
+
+  if (providers.google) {
+    const parametersWebJSONFile = `${rootDirectory}/infra/app/web.parameters.json`
+    const webParametersJSONFile = JSON.parse(await fs.readFile(parametersWebJSONFile, 'utf8'))
+    webParametersJSONFile.parameters['googleClientId'].value = providers.google.clientId
+    webParametersJSONFile.parameters['googleClientSecret'].value = providers.google.clientSecret
+    webParametersJSONFile.parameters['useIdentityProviders'].value = true
+
+    await fs.writeFile(webParametersJSONFile, JSON.stringify(parametersWebJSONFile, null, 2), {
+      encoding: 'utf8',
+    })
+
+    debug('Deploying authentication, hold on...')
+
+    const deployment = terminal(`azd provision --cwd ${rootDirectory} --output json`)
+
+    debug('Success!', deployment)
+  }
+}
+
 async function removeFiles(pathsToRemove, rootDirectory) {
   await Promise.all(
     pathsToRemove.map((p) => fs.rm(path.join(rootDirectory, p), { recursive: true, force: true }))
@@ -246,7 +270,22 @@ async function main({ rootDirectory }) {
 
   debug(`Start creating Remix app with name`, appName, `in`, rootDirectory)
 
+  // Check if user wants to add authentication
+  const answer = await inquirer.prompt({
+    name: 'provider',
+    message: 'Add Google as authentication provider?',
+    type: 'confirm',
+    default: true,
+  })
+
   const { deploymentOutputs, dbServerPassword } = await setupAzureResources(appName, rootDirectory)
+
+  if (answer.provider) {
+    const identityProviders = await setupEasyAuth({
+      url: deploymentOutputs.REACT_APP_WEB_BASE_URL.value,
+    })
+    await setupIdentityProviders(rootDirectory, identityProviders)
+  }
 
   const { database, connectionString, shadowConnectionString } = await setupDatabase(
     deploymentOutputs,

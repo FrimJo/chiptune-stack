@@ -11,12 +11,19 @@ param imageName string
 param keyVaultName string = ''
 param managedIdentity bool = !empty(keyVaultName)
 param targetPort int = 80
+param useIdentityProviders bool = false
 
 @description('CPU cores allocated to a single container instance, e.g. 0.5')
 param containerCpuCoreCount string = '0.5'
 
 @description('Memory allocated to a single container instance, e.g. 1Gi')
 param containerMemory string = '1.0Gi'
+
+@secure()
+param googleClientId string
+
+@secure()
+param googleClientSecret string
 
 resource app 'Microsoft.App/containerApps@2022-03-01' = {
   name: name
@@ -35,7 +42,7 @@ resource app 'Microsoft.App/containerApps@2022-03-01' = {
       secrets: [
         {
           name: 'google-client-secret'
-          value: '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'
+          value: googleClientSecret
         }
         {
           name: 'registry-password'
@@ -89,7 +96,7 @@ resource authSettings 'Microsoft.App/containerApps/authConfigs@2022-10-01' = {
           scopes: []
         }
         registration: {
-          clientId: '207547541555-ncl2atcvg7tge9deg9kag6es07okeuvp.apps.googleusercontent.com'
+          clientId: googleClientId
           clientSecretSettingName: 'google-client-secret'
         }
         validation: {
@@ -107,7 +114,7 @@ resource authSettings 'Microsoft.App/containerApps/authConfigs@2022-10-01' = {
       }
     }
     platform: {
-      enabled: true
+      enabled: useIdentityProviders
     }
   }
 }

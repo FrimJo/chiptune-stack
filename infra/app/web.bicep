@@ -10,12 +10,19 @@ param serviceName string = 'web'
 param databaseServerHost string
 param databaseName string
 param databaseUsername string
+param useIdentityProviders bool = false
 
 @secure()
 param databasePassword string
 
 @secure()
 param sessionSecret string
+
+@secure()
+param googleClientId string = ''
+
+@secure()
+param googleClientSecret string = ''
 
 module app '../core/host/container-app.bicep' = {
   name: '${serviceName}-container-app-module'
@@ -25,6 +32,9 @@ module app '../core/host/container-app.bicep' = {
     tags: union(tags, { 'azd-service-name': serviceName })
     containerAppsEnvironmentName: containerAppsEnvironmentName
     containerRegistryName: containerRegistryName
+    googleClientId: googleClientId
+    googleClientSecret: googleClientSecret
+    useIdentityProviders: useIdentityProviders
     env: [
       {
         name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
